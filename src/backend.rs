@@ -27,7 +27,10 @@ impl ExternalBackend {
             .spawn()
             .with_context(|| format!("Klarte ikkje å starte '{}'", self.lookup_cmd))?;
         {
-            let stdin = child.stdin.as_mut().ok_or_else(|| anyhow!("Manglar stdin"))?;
+            let stdin = child
+                .stdin
+                .as_mut()
+                .ok_or_else(|| anyhow!("Manglar stdin"))?;
             let input_trimmed = input.trim(); // trim input før vi sender til lookup
             stdin.write_all(input_trimmed.as_bytes())?;
             stdin.write_all(b"\n")?;
@@ -52,8 +55,12 @@ impl ExternalBackend {
         let mut results = Vec::new();
         for raw_line in stdout.lines() {
             let trimmed = raw_line.trim();
-            if trimmed.is_empty() { continue; }
-            if trimmed.starts_with('!') || trimmed.starts_with('#') { continue; }
+            if trimmed.is_empty() {
+                continue;
+            }
+            if trimmed.starts_with('!') || trimmed.starts_with('#') {
+                continue;
+            }
             let cols: Vec<&str> = raw_line.split('\t').collect();
             if cols.len() >= 2 {
                 let out = cols[1].trim().to_string(); // TRIM: fjern kant-blank
@@ -67,11 +74,17 @@ impl ExternalBackend {
 }
 impl Backend for ExternalBackend {
     fn analyze(&self, input: &str) -> Result<Vec<String>> {
-        let fst = self.analyzer_fst.as_ref().ok_or_else(|| anyhow!("Analyzer-FST ikkje sett"))?;
+        let fst = self
+            .analyzer_fst
+            .as_ref()
+            .ok_or_else(|| anyhow!("Analyzer-FST ikkje sett"))?;
         self.run_lookup(fst, input)
     }
     fn generate(&self, input: &str) -> Result<Vec<String>> {
-        let fst = self.generator_fst.as_ref().ok_or_else(|| anyhow!("Generator-FST ikkje sett"))?;
+        let fst = self
+            .generator_fst
+            .as_ref()
+            .ok_or_else(|| anyhow!("Generator-FST ikkje sett"))?;
         self.run_lookup(fst, input)
     }
 }

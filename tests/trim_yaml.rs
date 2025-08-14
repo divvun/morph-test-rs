@@ -1,12 +1,14 @@
+use anyhow::Result;
 use morph_test::backend::Backend;
 use morph_test::engine::run_suites;
 use morph_test::spec::{load_specs, BackendChoice};
-use anyhow::Result;
-use tempfile::tempdir;
 use std::fs;
+use tempfile::tempdir;
 struct MockGen;
 impl Backend for MockGen {
-    fn analyze(&self, _input: &str) -> Result<Vec<String>> { Ok(vec![]) }
+    fn analyze(&self, _input: &str) -> Result<Vec<String>> {
+        Ok(vec![])
+    }
     fn generate(&self, input: &str) -> Result<Vec<String>> {
         // Returnerer eksakt, utan ekstra blank
         Ok(match input {
@@ -34,7 +36,11 @@ Tests:
     assert_eq!(swc.len(), 1);
     let suite = &swc[0].suite;
     // Sjekk at trimming skjedde ved parsing
-    let c1 = suite.cases.iter().find(|c| c.input.starts_with("gæljodh+")).unwrap();
+    let c1 = suite
+        .cases
+        .iter()
+        .find(|c| c.input.starts_with("gæljodh+"))
+        .unwrap();
     assert_eq!(c1.input, "gæljodh+V+TV+Ind+Prs+Pl2");
     assert_eq!(c1.expect, vec!["gæljoejidie"]);
     let c2 = suite.cases.iter().find(|c| c.input == "foo+V").unwrap();

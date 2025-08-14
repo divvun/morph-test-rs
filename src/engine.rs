@@ -1,10 +1,14 @@
-use crate::types::{CaseResult, Direction, Summary, TestSuite};
 use crate::backend::Backend;
+use crate::types::{CaseResult, Direction, Summary, TestSuite};
 use rayon::prelude::*;
 fn vec_eq_exact(a: &[String], b: &[String]) -> bool {
-    if a.len() != b.len() { return false; }
+    if a.len() != b.len() {
+        return false;
+    }
     for (x, y) in a.iter().zip(b.iter()) {
-        if x != y { return false; }
+        if x != y {
+            return false;
+        }
     }
     true
 }

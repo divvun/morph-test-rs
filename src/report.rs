@@ -16,11 +16,7 @@ pub fn render_human(summary: &Summary) -> String {
     out.push('\n');
     for c in &summary.cases {
         if c.passed {
-            out.push_str(&format!(
-                "{} {}\n",
-                "[OK]".green().bold(),
-                c.name.green()
-            ));
+            out.push_str(&format!("{} {}\n", "[OK]".green().bold(), c.name.green()));
         } else {
             out.push_str(&format!(
                 "{} {}\n",

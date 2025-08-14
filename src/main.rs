@@ -1,10 +1,10 @@
 use anyhow::Result;
 use clap::{Parser, ValueEnum};
-use std::path::PathBuf;
 use morph_test::backend::{ExternalBackend, DEFAULT_TIMEOUT};
 use morph_test::engine::run_suites;
 use morph_test::report::print_human;
 use morph_test::spec::{load_specs, BackendChoice};
+use std::path::PathBuf;
 #[derive(Copy, Clone, Debug, Eq, PartialEq, ValueEnum)]
 enum BackendOpt {
     Auto,
@@ -25,7 +25,12 @@ impl From<BackendOpt> for BackendChoice {
 struct Cli {
     #[arg(value_name = "TEST_PATHS", required = true)]
     tests: Vec<PathBuf>,
-    #[arg(long, value_enum, default_value = "auto", help = "Vel backend når begge finst i Config")]
+    #[arg(
+        long,
+        value_enum,
+        default_value = "auto",
+        help = "Vel backend når begge finst i Config"
+    )]
     backend: BackendOpt,
 }
 fn main() -> Result<()> {

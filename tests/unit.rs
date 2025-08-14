@@ -1,8 +1,8 @@
-use morph_test::types::*;
+use anyhow::Result;
+use morph_test::backend::Backend;
 use morph_test::engine::run_suites;
 use morph_test::report::render_human;
-use morph_test::backend::Backend;
-use anyhow::Result;
+use morph_test::types::*;
 struct MockBackend;
 impl Backend for MockBackend {
     fn analyze(&self, _input: &str) -> Result<Vec<String>> {
