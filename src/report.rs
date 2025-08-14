@@ -29,6 +29,7 @@ fn dash_line(width: usize) -> String {
 }
 
 // Bygg blokker (gruppering per (gruppe, retning)) i encounter-ordning
+#[allow(clippy::type_complexity)]
 fn build_blocks(
     cases: &[CaseResult],
 ) -> (
