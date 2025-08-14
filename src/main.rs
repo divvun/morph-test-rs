@@ -4,7 +4,7 @@ use morph_test::backend::{ExternalBackend, DEFAULT_TIMEOUT};
 use morph_test::engine::run_suites;
 use morph_test::report::print_human;
 use morph_test::spec::{load_specs, BackendChoice};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 #[derive(Copy, Clone, Debug, Eq, PartialEq, ValueEnum)]
 enum BackendOpt {
     Auto,
@@ -64,19 +64,53 @@ struct Cli {
         help = "Overstyr lookup-kommando (t.d. hfst-optimised-lookup, flookup) [alias: --app]"
     )]
     lookup_tool: Option<String>,
-    // IGNORER ekstra analysar i Analyze-modus
+    // Ignorer ekstra analysar i Analyze-modus
     #[arg(
         short = 'i',
         long = "ignore-extra-analyses",
         help = "I Analyze-testar: ignorer ekstra analysar (godkjenn dersom alle forventa analysar finst)"
     )]
     ignore_extra_analyses: bool,
+    // Verbose-modus: metadata og framdriftsmeldingar
+    #[arg(
+        short = 'v',
+        long = "verbose",
+        help = "Vis metadata (lookup, generator, analyser, versjon) og korte framdriftsmeldingar"
+    )]
+    verbose: bool,
+}
+fn display_path(path: &str) -> String {
+    match std::fs::canonicalize(Path::new(path)) {
+        Ok(p) => p.to_string_lossy().into_owned(),
+        Err(_) => path.to_string(),
+    }
+}
+fn resolve_lookup_path(cmd: &str) -> String {
+    // Dersom cmd allereie er ein sti (inneheld skråstrek), prøv å canonicalize.
+    if cmd.contains(std::path::MAIN_SEPARATOR) || cmd.starts_with("./") || cmd.starts_with(".\\") {
+        return display_path(cmd);
+    }
+    // Elles, prøv å slå opp i PATH
+    match which::which(cmd) {
+        Ok(p) => p.to_string_lossy().into_owned(),
+        Err(_) => cmd.to_string(), // fallback til oppgitt streng
+    }
 }
 fn main() -> Result<()> {
+    // Rayon brukar all CPU-kjernar som standard (maks parallellitet).
     let cli = Cli::parse();
     let suites_with_cfg = load_specs(&cli.tests, cli.backend.into())?;
     let mut aggregate = morph_test::types::Summary::default();
+    // Print global metadata (versjon) ved verbose, om ikkje i silent-modus
+    if cli.verbose && !cli.silent {
+        println!(
+            "[INFO] {} v{}",
+            env!("CARGO_PKG_NAME"),
+            env!("CARGO_PKG_VERSION")
+        );
+    }
     for swc in suites_with_cfg {
+        // Overstyr generator/analyser frå CLI dersom oppgitt
         let effective_gen = if let Some(gen) = &cli.generator {
             gen.clone()
         } else {
@@ -87,11 +121,29 @@ fn main() -> Result<()> {
         } else {
             swc.morph_fst.clone()
         };
+        // Overstyr lookup-verktøy dersom oppgitt
         let effective_lookup = if let Some(tool) = &cli.lookup_tool {
             tool.trim().to_string()
         } else {
             swc.lookup_cmd.clone()
         };
+        // Lag fulle stiar for utskrift
+        let lookup_full = resolve_lookup_path(&effective_lookup);
+        let gen_full = display_path(&effective_gen);
+        let morph_full = effective_morph
+            .as_deref()
+            .map(display_path)
+            .unwrap_or_else(|| "-".to_string());
+        if cli.verbose && !cli.silent {
+            println!("[INFO] Suite         : {}", swc.suite.name);
+            println!("[INFO] Lookup tool   : {}", lookup_full);
+            println!("[INFO] Generator     : {}", gen_full);
+            println!("[INFO] Analyzer      : {}", morph_full);
+            println!(
+                "[INFO] Startar testing ({} testar)...",
+                swc.suite.cases.len()
+            );
+        }
         let backend = ExternalBackend {
             lookup_cmd: effective_lookup,
             generator_fst: Some(effective_gen),
@@ -100,6 +152,13 @@ fn main() -> Result<()> {
             quiet: cli.silent,
         };
         let summary = run_suites(&backend, &[swc.suite], cli.ignore_extra_analyses);
+        if cli.verbose && !cli.silent {
+            println!(
+                "[INFO] Ferdig: passed {}, failed {}. Skriv rapport...",
+                summary.passed, summary.failed
+            );
+        }
+        // Berre skriv rapport dersom ikkje stille modus
         if !cli.silent {
             print_human(&summary, cli.ignore_extra_analyses);
         }
@@ -108,6 +167,13 @@ fn main() -> Result<()> {
         aggregate.failed += summary.failed;
         aggregate.cases.extend(summary.cases);
     }
+    if cli.verbose && !cli.silent {
+        println!(
+            "[INFO] Alle testkøyringar ferdige. Total: {}, Passed: {}, Failed: {}",
+            aggregate.total, aggregate.passed, aggregate.failed
+        );
+    }
+    // Exit-kode: 0 når alt OK, elles ≠ 0
     if aggregate.failed > 0 {
         std::process::exit(1);
     }
