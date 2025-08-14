@@ -1,7 +1,8 @@
 use crate::types::{Direction, TestCase, TestSuite};
 use anyhow::{Context, Result, anyhow};
+use indexmap::IndexMap;
 use serde::Deserialize;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 use std::fs;
 use std::path::PathBuf;
 use walkdir::WalkDir;
@@ -50,7 +51,7 @@ pub enum OneOrMany {
 #[serde(rename_all = "PascalCase")]
 pub struct RawSpec {
     pub config: Option<RawConfig>,
-    pub tests: BTreeMap<String, BTreeMap<String, OneOrMany>>,
+    pub tests: IndexMap<String, IndexMap<String, OneOrMany>>,
 }
 
 #[derive(Debug, Clone)]
@@ -98,7 +99,7 @@ pub fn load_specs(paths: &[PathBuf], prefer: BackendChoice) -> Result<Vec<SuiteW
         for (group, map) in &raw.tests {
             let group_name = group.trim();
             // Akkumulator for analyze: surface -> set av analysar (lexical-nøkkel)
-            let mut surface_to_analyses: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+            let mut surface_to_analyses: IndexMap<String, BTreeSet<String>> = IndexMap::new();
             for (lexical, expected) in map {
                 let lexical_trim = lexical.trim().to_string();
                 let expect_vec: Vec<String> = match expected {

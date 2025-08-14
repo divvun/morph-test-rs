@@ -22,9 +22,18 @@ rayon = "1.10"
 colored = "3"
 wait-timeout = "0.2"
 which = "8.0"
+indexmap = { version = "2.0", features = ["serde"] }
 
 [dev-dependencies]
 tempfile = "3.20"
+
+[profile.dev]
+opt-level = 1
+
+[profile.release]
+debug = true
+codegen-units = 1
+lto = "fat"
 
 [package.metadata.binstall]
 pkg-url = "{ repo }/releases/download/v{ version }/{ name }-{ target }-v{ version }{ archive-suffix }"

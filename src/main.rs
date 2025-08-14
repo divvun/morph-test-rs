@@ -1,7 +1,7 @@
 use anyhow::Result;
 use clap::{Parser, ValueEnum};
 use colored::control::set_override as set_color_override;
-use morph_test::backend::{DEFAULT_TIMEOUT, ExternalBackend};
+use morph_test::backend::{Backend, DEFAULT_TIMEOUT, ExternalBackend};
 use morph_test::engine::run_suites;
 use morph_test::report::{OutputKind, print_human};
 use morph_test::spec::{BackendChoice, load_specs};
@@ -382,7 +382,7 @@ fn main() -> Result<()> {
             println!("[INFO] Generator     : {gen_full}");
             println!("[INFO] Analyzer      : {morph_full}");
             println!(
-                "[INFO] Startar testing ({} testar, modus: {})...",
+                "[INFO] Startar testing ({} testar, modus: {}) (batch processing)...",
                 swc.suite.cases.len(),
                 mode_txt
             );
@@ -395,6 +395,12 @@ fn main() -> Result<()> {
             timeout: Some(DEFAULT_TIMEOUT),
             quiet: cli.silent,
         };
+
+        // Validate backend before running tests - fail fast on configuration errors
+        if let Err(e) = backend.validate() {
+            eprintln!("Feil: {}", e);
+            std::process::exit(2);
+        }
 
         let summary = run_suites(&backend, &[swc.suite], cli.ignore_extra_analyses);
 

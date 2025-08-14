@@ -1,4 +1,5 @@
 use anyhow::{Context, Result, anyhow};
+use indexmap::IndexMap;
 use std::io::Write;
 use std::process::{Command, Stdio};
 use std::time::Duration;
@@ -18,12 +19,13 @@ pub struct ExternalBackend {
 }
 
 pub trait Backend: Send + Sync {
-    fn analyze(&self, input: &str) -> Result<Vec<String>>;
-    fn generate(&self, input: &str) -> Result<Vec<String>>;
+    fn analyze_batch(&self, inputs: &[String]) -> Result<Vec<Vec<String>>>;
+    fn generate_batch(&self, inputs: &[String]) -> Result<Vec<Vec<String>>>;
+    fn validate(&self) -> Result<()>;
 }
 
 impl ExternalBackend {
-    fn run_lookup(&self, fst: &str, input: &str) -> Result<Vec<String>> {
+    fn run_lookup_batch(&self, fst: &str, inputs: &[String]) -> Result<Vec<Vec<String>>> {
         let timeout = self.timeout.unwrap_or(DEFAULT_TIMEOUT);
 
         let mut cmd = Command::new(&self.lookup_cmd);
@@ -38,17 +40,24 @@ impl ExternalBackend {
 
         let mut child = cmd
             .spawn()
-            .with_context(|| format!("Klarte ikkje å starte '{}'", self.lookup_cmd))?;
+            .with_context(|| format!("Klarte ikkje å starta '{}'", self.lookup_cmd))?;
+
+        // Send all inputs at once
         {
             let stdin = child
                 .stdin
                 .as_mut()
                 .ok_or_else(|| anyhow!("Manglar stdin"))?;
-            let input_trimmed = input.trim();
-            stdin.write_all(input_trimmed.as_bytes())?;
-            stdin.write_all(b"\n")?;
+
+            for input in inputs {
+                let input_trimmed = input.trim();
+                stdin.write_all(input_trimmed.as_bytes())?;
+                stdin.write_all(b"\n")?;
+            }
+            // Drop stdin to close it and signal EOF
         }
 
+        // Wait for completion with timeout
         match child.wait_timeout(timeout)? {
             Some(status) => {
                 if !status.success() {
@@ -64,11 +73,18 @@ impl ExternalBackend {
 
         let out = child.wait_with_output()?;
         if !out.status.success() {
-            return Err(anyhow!("Lookup-prosess feila med status {}", out.status));
+            let stderr = String::from_utf8_lossy(&out.stderr);
+            return Err(anyhow!(
+                "Lookup-prosess feila med status {}\nStderr: {}",
+                out.status,
+                stderr
+            ));
         }
 
+        // Parse batch output - FST tools output: input\toutput format
         let stdout = String::from_utf8_lossy(&out.stdout);
-        let mut results = Vec::new();
+        let mut results_map: IndexMap<String, Vec<String>> = IndexMap::new();
+
         for raw_line in stdout.lines() {
             let trimmed = raw_line.trim();
             if trimmed.is_empty() {
@@ -77,32 +93,83 @@ impl ExternalBackend {
             if trimmed.starts_with('!') || trimmed.starts_with('#') {
                 continue;
             }
+
             let cols: Vec<&str> = raw_line.split('\t').collect();
             if cols.len() >= 2 {
-                let out = cols[1].trim().to_string(); // eksakt tekst, men utan kant-blank
-                if !out.is_empty() && out != "@" {
-                    results.push(out);
+                let input = cols[0].trim().to_string();
+                let output = cols[1].trim().to_string();
+                if !output.is_empty() && output != "@" {
+                    results_map.entry(input).or_default().push(output);
                 }
             }
         }
-        Ok(results)
+
+        // Build ordered results matching input order
+        let mut all_results = Vec::new();
+        for input in inputs {
+            let input_key = input.trim().to_string();
+            let results = results_map.shift_remove(&input_key).unwrap_or_default();
+            all_results.push(results);
+        }
+
+        Ok(all_results)
     }
 }
 
 impl Backend for ExternalBackend {
-    fn analyze(&self, input: &str) -> Result<Vec<String>> {
+    fn analyze_batch(&self, inputs: &[String]) -> Result<Vec<Vec<String>>> {
         let fst = self
             .analyzer_fst
             .as_ref()
             .ok_or_else(|| anyhow!("Analyzer-FST ikkje sett"))?;
-        self.run_lookup(fst, input)
+        self.run_lookup_batch(fst, inputs)
     }
 
-    fn generate(&self, input: &str) -> Result<Vec<String>> {
+    fn generate_batch(&self, inputs: &[String]) -> Result<Vec<Vec<String>>> {
         let fst = self
             .generator_fst
             .as_ref()
             .ok_or_else(|| anyhow!("Generator-FST ikkje sett"))?;
-        self.run_lookup(fst, input)
+        self.run_lookup_batch(fst, inputs)
+    }
+
+    fn validate(&self) -> Result<()> {
+        // Check if lookup command exists and is executable
+        use std::process::Command;
+
+        let mut cmd = Command::new(&self.lookup_cmd);
+        cmd.arg("--help")
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped());
+
+        match cmd.spawn() {
+            Ok(mut child) => {
+                match child.wait() {
+                    Ok(_status) => {
+                        // Command exists and ran, don't care about exit code for --help
+                        Ok(())
+                    }
+                    Err(e) => Err(anyhow!(
+                        "Lookup-kommando '{}' kunne ikkje køyrast: {}",
+                        self.lookup_cmd,
+                        e
+                    )),
+                }
+            }
+            Err(e) => {
+                if e.kind() == std::io::ErrorKind::NotFound {
+                    Err(anyhow!(
+                        "Lookup-kommando '{}' finst ikkje eller kan ikkje køyrast. Sjekk at den er installert og i PATH.",
+                        self.lookup_cmd
+                    ))
+                } else {
+                    Err(anyhow!(
+                        "Kan ikkje køyre lookup-kommando '{}': {}",
+                        self.lookup_cmd,
+                        e
+                    ))
+                }
+            }
+        }
     }
 }

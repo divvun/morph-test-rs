@@ -1,6 +1,7 @@
 use crate::types::{CaseResult, Direction, Summary};
 use colored::Colorize;
-use std::collections::{BTreeMap, BTreeSet};
+use indexmap::IndexMap;
+use std::collections::BTreeSet;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum OutputKind {
@@ -40,10 +41,10 @@ fn build_blocks(
     cases: &[CaseResult],
 ) -> (
     Vec<(String, Direction)>,
-    BTreeMap<(String, Direction), Vec<&CaseResult>>,
+    IndexMap<(String, Direction), Vec<&CaseResult>>,
 ) {
     let mut order: Vec<Key> = Vec::new();
-    let mut groups: BTreeMap<(String, Direction), Vec<&CaseResult>> = BTreeMap::new();
+    let mut groups: IndexMap<(String, Direction), Vec<&CaseResult>> = IndexMap::new();
     for c in cases {
         let (group, _) = parse_group(&c.name);
         let key = (group.to_string(), c.direction.clone());
