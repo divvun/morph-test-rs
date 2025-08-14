@@ -5,12 +5,14 @@ use std::time::Duration;
 use wait_timeout::ChildExt;
 /// 30 sekund per oppslag
 pub const DEFAULT_TIMEOUT: Duration = Duration::from_secs(30);
+/// Generisk backend som køyrer eit eksternt lookup-program (hfst-optimised-lookup, flookup, osb.)
 #[derive(Debug, Clone)]
 pub struct ExternalBackend {
-    pub lookup_cmd: String,
+    pub lookup_cmd: String, // "hfst-optimised-lookup" eller "flookup"
     pub generator_fst: Option<String>,
     pub analyzer_fst: Option<String>,
     pub timeout: Option<Duration>,
+    pub quiet: bool, // <- ny: demp stderr frå lookup når true
 }
 pub trait Backend: Send + Sync {
     fn analyze(&self, input: &str) -> Result<Vec<String>>;
@@ -19,11 +21,16 @@ pub trait Backend: Send + Sync {
 impl ExternalBackend {
     fn run_lookup(&self, fst: &str, input: &str) -> Result<Vec<String>> {
         let timeout = self.timeout.unwrap_or(DEFAULT_TIMEOUT);
-        let mut child = Command::new(&self.lookup_cmd)
-            .arg(fst)
+        let mut cmd = Command::new(&self.lookup_cmd);
+        cmd.arg(fst)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
-            .stderr(Stdio::inherit())
+            .stderr(if self.quiet {
+                Stdio::null()
+            } else {
+                Stdio::inherit()
+            });
+        let mut child = cmd
             .spawn()
             .with_context(|| format!("Klarte ikkje å starte '{}'", self.lookup_cmd))?;
         {
@@ -63,7 +70,7 @@ impl ExternalBackend {
             }
             let cols: Vec<&str> = raw_line.split('\t').collect();
             if cols.len() >= 2 {
-                let out = cols[1].trim().to_string(); // TRIM: fjern kant-blank
+                let out = cols[1].trim().to_string(); // eksakt tekst, men utan kant-blank
                 if !out.is_empty() && out != "@" {
                     results.push(out);
                 }

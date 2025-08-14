@@ -42,6 +42,12 @@ struct Cli {
     generator: Option<String>,
     #[arg(long, aliases = ["analyzer", "morph"], value_name = "FILE", help = "Overstyr analyser-FST (.hfstol for HFST, .foma for Foma)")]
     analyser: Option<String>,
+    #[arg(
+        short = 'q',
+        long = "silent",
+        help = "Stille modus: ingen utskrift, og demp stderr frå lookup"
+    )]
+    silent: bool,
 }
 fn main() -> Result<()> {
     // Rayon brukar all CPU-kjernar som standard (maks parallellitet).
@@ -65,10 +71,13 @@ fn main() -> Result<()> {
             generator_fst: Some(effective_gen),
             analyzer_fst: effective_morph,
             timeout: Some(DEFAULT_TIMEOUT),
+            quiet: cli.silent, // <- ny
         };
         let summary = run_suites(&backend, &[swc.suite]);
-        // Print per-fil for kontekst
-        print_human(&summary);
+        // Berre skriv rapport dersom ikkje stille modus
+        if !cli.silent {
+            print_human(&summary);
+        }
         aggregate.total += summary.total;
         aggregate.passed += summary.passed;
         aggregate.failed += summary.failed;
