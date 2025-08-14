@@ -29,6 +29,29 @@ fn dash_line(width: usize) -> String {
     "-".repeat(width)
 }
 
+fn print_failure_detailed(case: &CaseResult, i: usize, n_cases: usize, expected_item: &str) {
+    println!(
+        "[{}/{}][{}] {} => {}",
+        i,
+        n_cases,
+        "FAIL".red().bold(),
+        case.input,
+        expected_item
+    );
+
+    if let Some(error) = &case.error {
+        println!("         Error: {}", error.red());
+    } else {
+        let actual_str = if case.actual.is_empty() {
+            "<none>".dimmed().to_string()
+        } else {
+            case.actual.join(", ")
+        };
+        println!("         Expected: {}", expected_item.green());
+        println!("         Got:      {}", actual_str.yellow());
+    }
+}
+
 #[derive(PartialEq, Eq, PartialOrd, Ord)]
 struct Key {
     group: String,
@@ -104,17 +127,25 @@ fn print_human_normal(
                     Direction::Analyze if ignore_extra_analyses => true,
                     _ => case.actual.is_empty(),
                 };
-                let status_str = if is_pass {
+                let _status_str = if is_pass {
                     "PASS".green().bold()
                 } else {
                     "FAIL".red().bold()
                 };
                 let hide_line = (is_pass && hide_passes) || (!is_pass && hide_fails);
                 if !hide_line {
-                    println!(
-                        "[{}/{}][{}] {} => {}",
-                        i, n_cases, status_str, case.input, placeholder
-                    );
+                    if is_pass {
+                        println!(
+                            "[{}/{}][{}] {} => {}",
+                            i,
+                            n_cases,
+                            "PASS".green().bold(),
+                            case.input,
+                            placeholder
+                        );
+                    } else {
+                        print_failure_detailed(case, i, n_cases, placeholder);
+                    }
                 }
                 total_checks += 1;
                 if is_pass {
@@ -144,14 +175,20 @@ fn print_human_normal(
             // Éi linje per forventa verdi (PASS/FAIL)
             for exp in &case.expected {
                 let ok = act_set.contains(exp.as_str());
-                let status = if ok {
-                    "PASS".green().bold()
-                } else {
-                    "FAIL".red().bold()
-                };
                 let hide_line = (ok && hide_passes) || (!ok && hide_fails);
                 if !hide_line {
-                    println!("[{}/{}][{}] {} => {}", i, n_cases, status, case.input, exp);
+                    if ok {
+                        println!(
+                            "[{}/{}][{}] {} => {}",
+                            i,
+                            n_cases,
+                            "PASS".green().bold(),
+                            case.input,
+                            exp
+                        );
+                    } else {
+                        print_failure_detailed(case, i, n_cases, exp);
+                    }
                 }
                 total_checks += 1;
                 if ok {

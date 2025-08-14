@@ -179,6 +179,7 @@ fn resolve_backend(
                 .hfst
                 .as_ref()
                 .ok_or_else(|| anyhow!("Config.hfst manglar"))?;
+            println!("{h:?}");
             let gen_ = h
                 .r#gen
                 .clone()

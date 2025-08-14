@@ -1,11 +1,14 @@
 use anyhow::Result;
 use clap::{Parser, ValueEnum};
 use colored::control::set_override as set_color_override;
+use futures::future::try_join_all;
 use morph_test::backend::{Backend, DEFAULT_TIMEOUT, ExternalBackend};
 use morph_test::engine::run_suites;
+use morph_test::engine_async::run_suites_async;
+use morph_test::pool::PooledBackend;
 use morph_test::report::{OutputKind, print_human};
 use morph_test::spec::{BackendChoice, load_specs};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
 #[cfg(feature = "mimalloc")]
@@ -45,7 +48,7 @@ impl From<OutputFormat> for OutputKind {
         }
     }
 }
-#[derive(Parser, Debug)]
+#[derive(Parser, Debug, Clone)]
 #[command(
     version,
     author,
@@ -184,6 +187,13 @@ struct Cli {
         help = "Rapportformat: compact | terse | final | normal (standard: normal)"
     )]
     output: OutputFormat,
+
+    // Process pool parallel execution
+    #[arg(
+        long = "pool",
+        help = "Bruk process pool for parallell køyring (raskare for mange tester)"
+    )]
+    use_pool: bool,
 }
 
 fn display_path(path: &str) -> String {
@@ -225,7 +235,8 @@ struct BlockRef {
     dir: morph_test::types::Direction,
 }
 
-fn main() -> Result<()> {
+#[tokio::main]
+async fn main() -> Result<()> {
     let cli = Cli::parse();
     // Fargar: standard på, --no-color slår av
     if cli.no_color {
@@ -351,6 +362,33 @@ fn main() -> Result<()> {
             env!("CARGO_PKG_VERSION")
         );
     }
+    if cli.use_pool {
+        // Use process pool for parallel execution
+        process_suites_with_pool(suites, &cli, &mut aggregate).await?;
+    } else {
+        // Use traditional sequential processing
+        process_suites_sequential(suites, &cli, &mut aggregate).await?;
+    }
+
+    if cli.verbose && !cli.silent {
+        println!(
+            "[INFO] Alle testkøyringar ferdige. Total: {}, Passed: {}, Failed: {}",
+            aggregate.total, aggregate.passed, aggregate.failed
+        );
+    }
+
+    if aggregate.failed > 0 {
+        std::process::exit(1);
+    }
+
+    Ok(())
+}
+
+async fn process_suites_sequential(
+    suites: Vec<morph_test::spec::SuiteWithConfig>,
+    cli: &Cli,
+    aggregate: &mut morph_test::types::Summary,
+) -> Result<()> {
     // Køyr per suite
     for swc in suites {
         // Overstyr frå CLI
@@ -402,7 +440,7 @@ fn main() -> Result<()> {
 
         // Validate backend before running tests - fail fast on configuration errors
         if let Err(e) = backend.validate() {
-            eprintln!("Feil: {}", e);
+            eprintln!("Feil: {e}");
             std::process::exit(2);
         }
 
@@ -431,16 +469,114 @@ fn main() -> Result<()> {
         aggregate.failed += summary.failed;
         aggregate.cases.extend(summary.cases);
     }
+    Ok(())
+}
 
-    if cli.verbose && !cli.silent {
-        println!(
-            "[INFO] Alle testkøyringar ferdige. Total: {}, Passed: {}, Failed: {}",
-            aggregate.total, aggregate.passed, aggregate.failed
+async fn process_suites_with_pool(
+    suites: Vec<morph_test::spec::SuiteWithConfig>,
+    cli: &Cli,
+    aggregate: &mut morph_test::types::Summary,
+) -> Result<()> {
+    // Group suites by backend configuration to share pools
+    let mut backend_groups: HashMap<String, Vec<morph_test::spec::SuiteWithConfig>> =
+        HashMap::new();
+
+    for swc in suites {
+        // Create a key based on lookup command and FST files
+        let effective_gen = cli.generator.clone().unwrap_or_else(|| swc.gen_fst.clone());
+        let effective_morph = cli.analyser.clone().or(swc.morph_fst.clone());
+        let effective_lookup = cli
+            .lookup_tool
+            .clone()
+            .map(|s| s.trim().to_string())
+            .unwrap_or_else(|| swc.lookup_cmd.clone());
+
+        let key = format!(
+            "{}__{}__{}",
+            effective_lookup,
+            effective_gen,
+            effective_morph.unwrap_or_default()
         );
+
+        backend_groups.entry(key).or_default().push(swc);
     }
 
-    if aggregate.failed > 0 {
-        std::process::exit(1);
+    // Process each backend group in parallel
+    let group_futures: Vec<_> = backend_groups
+        .into_values()
+        .map(|group_suites| {
+            let cli = cli.clone();
+            async move {
+                // Create pooled backend for this group
+                let first_suite = &group_suites[0];
+                let effective_gen = cli
+                    .generator
+                    .clone()
+                    .unwrap_or_else(|| first_suite.gen_fst.clone());
+                let effective_morph = cli.analyser.clone().or(first_suite.morph_fst.clone());
+                let effective_lookup = cli
+                    .lookup_tool
+                    .clone()
+                    .map(|s| s.trim().to_string())
+                    .unwrap_or_else(|| first_suite.lookup_cmd.clone());
+
+                let pooled_backend = PooledBackend::new(
+                    effective_lookup,
+                    effective_morph,
+                    Some(effective_gen),
+                    cli.silent,
+                )
+                .await?;
+
+                // Validate backend
+                pooled_backend.validate().await?;
+
+                // Process all suites in this group sequentially (they share the same backend)
+                let mut group_summaries = Vec::new();
+                for swc in group_suites {
+                    if cli.verbose && !cli.silent {
+                        println!("[INFO] Suite: {} (pool processing)...", swc.suite.name);
+                    }
+
+                    let summary =
+                        run_suites_async(&pooled_backend, &[swc.suite], cli.ignore_extra_analyses)
+                            .await?;
+
+                    if cli.verbose && !cli.silent {
+                        println!(
+                            "[INFO] Ferdig: passed {}, failed {}. Skriv rapport...",
+                            summary.passed, summary.failed
+                        );
+                    }
+
+                    if !cli.silent {
+                        print_human(
+                            &summary,
+                            cli.ignore_extra_analyses,
+                            cli.verbose,
+                            cli.hide_fails,
+                            cli.hide_passes,
+                            cli.output.into(),
+                        );
+                    }
+
+                    group_summaries.push(summary);
+                }
+
+                Ok::<Vec<morph_test::types::Summary>, anyhow::Error>(group_summaries)
+            }
+        })
+        .collect();
+
+    // Await all groups and aggregate results
+    let all_group_results = try_join_all(group_futures).await?;
+    for group_summaries in all_group_results {
+        for summary in group_summaries {
+            aggregate.total += summary.total;
+            aggregate.passed += summary.passed;
+            aggregate.failed += summary.failed;
+            aggregate.cases.extend(summary.cases);
+        }
     }
 
     Ok(())

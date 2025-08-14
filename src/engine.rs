@@ -85,7 +85,7 @@ pub fn run_suites<B: Backend>(
                         input: case.input.clone(),
                         expected: case.expect.clone(),
                         actual: vec![],
-                        error: Some(format!("Batch analyze error: {}", e)),
+                        error: Some(format!("Batch analyze error: {e}")),
                         passed: false,
                     };
                 }
@@ -124,7 +124,7 @@ pub fn run_suites<B: Backend>(
                         input: case.input.clone(),
                         expected: case.expect.clone(),
                         actual: vec![],
-                        error: Some(format!("Batch generate error: {}", e)),
+                        error: Some(format!("Batch generate error: {e}")),
                         passed: false,
                     };
                 }
