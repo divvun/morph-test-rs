@@ -33,14 +33,21 @@ struct Cli {
         help = "Vel backend (hfst eller foma)"
     )]
     backend: BackendOpt,
+    // --generator og synonymet --gen
     #[arg(
         long,
-        alias = "gen",
         value_name = "FILE",
-        help = "Overstyr generator-FST (.hfstol for HFST, .foma for Foma)"
+        visible_alias = "gen",
+        help = "Overstyr generator-FST (.hfstol for HFST, .foma for Foma) [alias: --gen]"
     )]
     generator: Option<String>,
-    #[arg(long, aliases = ["analyzer", "morph"], value_name = "FILE", help = "Overstyr analyser-FST (.hfstol for HFST, .foma for Foma)")]
+    // --analyser og synonyma --morph og --analyzer
+    #[arg(
+        long,
+        value_name = "FILE",
+        visible_aliases = ["morph", "analyzer"],
+        help = "Overstyr analyser-FST (.hfstol for HFST, .foma for Foma) [alias: --morph, --analyzer]"
+    )]
     analyser: Option<String>,
     #[arg(
         short = 'q',
