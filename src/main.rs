@@ -30,7 +30,6 @@ impl From<BackendOpt> for BackendChoice {
 struct Cli {
     #[arg(value_name = "TEST_PATHS", required = true)]
     tests: Vec<PathBuf>,
-    // Standard: HFST med hfst-optimised-lookup
     #[arg(
         long,
         value_enum,
@@ -38,7 +37,6 @@ struct Cli {
         help = "Vel backend (hfst eller foma)"
     )]
     backend: BackendOpt,
-    // --generator og synonymet --gen
     #[arg(
         long,
         value_name = "FILE",
@@ -46,22 +44,14 @@ struct Cli {
         help = "Overstyr generator-FST (.hfstol for HFST, .foma for Foma) [alias: --gen]"
     )]
     generator: Option<String>,
-    // --analyser og synonyma --morph og --analyzer
-    #[arg(
-        long,
-        value_name = "FILE",
-        visible_aliases = ["morph", "analyzer"],
-        help = "Overstyr analyser-FST (.hfstol for HFST, .foma for Foma) [alias: --morph, --analyzer]"
-    )]
+    #[arg(long, value_name = "FILE", visible_aliases = ["morph", "analyzer"], help = "Overstyr analyser-FST (.hfstol for HFST, .foma for Foma) [alias: --morph, --analyzer]")]
     analyser: Option<String>,
-    // Stille-modus
     #[arg(
         short = 'q',
         long = "silent",
         help = "Stille modus: ingen utskrift, og demp stderr frå lookup"
     )]
     silent: bool,
-    // Overstyr lookup-kommandoen (alias --app for YAML-kompat)
     #[arg(
         long = "lookup-tool",
         value_name = "CMD",
@@ -69,14 +59,12 @@ struct Cli {
         help = "Overstyr lookup-kommando (t.d. hfst-optimised-lookup, flookup) [alias: --app]"
     )]
     lookup_tool: Option<String>,
-    // Ignorer ekstra analysar i Analyze-modus
     #[arg(
         short = 'i',
         long = "ignore-extra-analyses",
         help = "Analyze-testar: godkjenn når alle forventa analysar finst, sjølv om det finst ekstra analysar"
     )]
     ignore_extra_analyses: bool,
-    // Fargekontroll
     #[arg(
         short = 'c',
         long = "color",
@@ -88,14 +76,12 @@ struct Cli {
         help = "Slå av fargar i rapporten (overstyrer --color)"
     )]
     no_color: bool,
-    // Verbose-modus
     #[arg(
         short = 'v',
         long = "verbose",
-        help = "Vis metadata (lookup med full sti, generator/analyzer med fulle stiar, versjon) og framdriftsmeldingar. Viser òg ‘generated/analyses’ for PASS og ‘extra analyses’ for Analyze-testar."
+        help = "Vis metadata (lookup med full sti, generator/analyzer med fulle stiar, versjon) og framdriftsmeldingar. Viser òg ‘EXTRA’ for Analyze-PASS når -i er aktiv."
     )]
     verbose: bool,
-    // Filtrer retning
     #[arg(
         short = 's',
         long = "surface",
@@ -128,7 +114,6 @@ fn resolve_lookup_path(cmd: &str) -> String {
 }
 fn main() -> Result<()> {
     let cli = Cli::parse();
-    // Sett fargepolicy tidleg. --no-color vinn over --color. Standard: fargar på.
     if cli.no_color {
         set_color_override(false);
     } else {
@@ -144,7 +129,7 @@ fn main() -> Result<()> {
         );
     }
     for mut swc in suites_with_cfg {
-        // Filtrér cases etter ønskja retning
+        // Filtrér cases etter ønskja retning (no finst begge i suite.cases)
         if cli.surface {
             swc.suite
                 .cases
@@ -157,7 +142,6 @@ fn main() -> Result<()> {
         if swc.suite.cases.is_empty() {
             continue;
         }
-        // Overstyr frå CLI
         let effective_gen = cli.generator.clone().unwrap_or_else(|| swc.gen_fst.clone());
         let effective_morph = if let Some(m) = &cli.analyser {
             Some(m.clone())
@@ -169,18 +153,13 @@ fn main() -> Result<()> {
             .clone()
             .map(|s| s.trim().to_string())
             .unwrap_or_else(|| swc.lookup_cmd.clone());
-        // Fullstiar for verbose
-        let lookup_full = resolve_lookup_path(&effective_lookup);
-        let gen_full = display_path(&effective_gen);
-        let morph_full = effective_morph
-            .as_deref()
-            .map(display_path)
-            .unwrap_or_else(|| "-".to_string());
         if cli.verbose && !cli.silent {
-            println!("[INFO] Suite         : {}", swc.suite.name);
-            println!("[INFO] Lookup tool   : {}", lookup_full);
-            println!("[INFO] Generator     : {}", gen_full);
-            println!("[INFO] Analyzer      : {}", morph_full);
+            let lookup_full = resolve_lookup_path(&effective_lookup);
+            let gen_full = display_path(&effective_gen);
+            let morph_full = effective_morph
+                .as_deref()
+                .map(display_path)
+                .unwrap_or_else(|| "-".to_string());
             let mode_txt = if cli.surface {
                 "Analyze-only"
             } else if cli.lexical {
@@ -188,6 +167,10 @@ fn main() -> Result<()> {
             } else {
                 "All"
             };
+            println!("[INFO] Suite         : {}", swc.suite.name);
+            println!("[INFO] Lookup tool   : {}", lookup_full);
+            println!("[INFO] Generator     : {}", gen_full);
+            println!("[INFO] Analyzer      : {}", morph_full);
             println!(
                 "[INFO] Startar testing ({} testar, modus: {})...",
                 swc.suite.cases.len(),

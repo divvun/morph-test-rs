@@ -1,7 +1,7 @@
 use crate::types::{Direction, TestCase, TestSuite};
 use anyhow::{anyhow, Context, Result};
 use serde::Deserialize;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::PathBuf;
 use walkdir::WalkDir;
@@ -41,20 +41,10 @@ pub enum OneOrMany {
     Many(Vec<String>),
 }
 #[derive(Debug, Deserialize, Clone)]
-#[serde(rename_all = "lowercase")]
-pub enum FileMode {
-    #[serde(alias = "generate", alias = "generation", alias = "lexical")]
-    Generate,
-    #[serde(alias = "analyze", alias = "analysis", alias = "surface")]
-    Analyze,
-}
-#[derive(Debug, Deserialize, Clone)]
 #[serde(rename_all = "PascalCase")]
 pub struct RawSpec {
     pub config: Option<RawConfig>,
     pub tests: BTreeMap<String, BTreeMap<String, OneOrMany>>,
-    #[serde(default)]
-    pub mode: Option<FileMode>,
 }
 #[derive(Debug, Clone)]
 pub struct SuiteWithConfig {
@@ -94,25 +84,45 @@ pub fn load_specs(paths: &[PathBuf], prefer: BackendChoice) -> Result<Vec<SuiteW
             .with_context(|| format!("YAML-feil i: {}", f.display()))?;
         let (backend, lookup_cmd, gen_fst, morph_fst) = resolve_backend(&raw, &prefer)
             .with_context(|| format!("Mangelfull eller utydeleg Config i {}", f.display()))?;
-        let suite_mode = raw.mode.clone().unwrap_or(FileMode::Generate);
-        let mut cases = Vec::new();
+        let mut cases: Vec<TestCase> = Vec::new();
+        // For kvar gruppe: bygg både generate-cases og inverter til analyze-cases
         for (group, map) in &raw.tests {
             let group_name = group.trim();
-            for (input, expected) in map {
-                let input_trim = input.trim().to_string();
-                let expect_vec = match expected {
+            // Akkumulator for analyze: surface -> set av analysar (lexical-nøkkel)
+            let mut surface_to_analyses: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+            for (lexical, expected) in map {
+                let lexical_trim = lexical.trim().to_string();
+                let expect_vec: Vec<String> = match expected {
                     OneOrMany::One(s) => vec![trim_owned(s)],
                     OneOrMany::Many(v) => v.iter().map(|s| s.trim().to_string()).collect(),
                 };
-                let name = format!("{}: {}", group_name, &input_trim);
+                // 1) Generate-case: input=lexical, expect=surface-former
+                let name = format!("{}: {}", group_name, &lexical_trim);
                 cases.push(TestCase {
                     name,
-                    direction: match suite_mode {
-                        FileMode::Generate => Direction::Generate,
-                        FileMode::Analyze => Direction::Analyze,
-                    },
-                    input: input_trim,
-                    expect: expect_vec,
+                    direction: Direction::Generate,
+                    input: lexical_trim.clone(),
+                    expect: expect_vec.clone(),
+                });
+                // 2) Inverter til analyze: for kvar surface legg til lexical som analyse
+                for surf in expect_vec {
+                    let entry = surface_to_analyses
+                        .entry(surf)
+                        .or_insert_with(BTreeSet::new);
+                    entry.insert(lexical_trim.clone());
+                }
+            }
+            // Lag Analyze-cases frå akkumulatoren
+            for (surface, analyses_set) in surface_to_analyses {
+                let mut analyses: Vec<String> = analyses_set.into_iter().collect();
+                // Stabil, deterministisk rekkjefølgje
+                analyses.sort();
+                let name = format!("{}: {}", group_name, surface);
+                cases.push(TestCase {
+                    name,
+                    direction: Direction::Analyze,
+                    input: surface,
+                    expect: analyses,
                 });
             }
         }
