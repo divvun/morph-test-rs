@@ -1,21 +1,36 @@
 [package]
 name = "morph-test"
 version = "0.3.0"
-edition = "2021"
+edition = "2024"
+
 [lib]
 name = "morph_test"
 path = "src/lib.rs"
+
 [[bin]]
 name = "morph-test"
 path = "src/main.rs"
+
 [dependencies]
 anyhow = "1.0"
-thiserror = "1.0"
+thiserror = "2.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.9"
 clap = { version = "4.5", features = ["derive"] }
 walkdir = "2.5"
 rayon = "1.10"
-colored = "2.1"
+colored = "3"
 wait-timeout = "0.2"
-which = "6.0"
+which = "8.0"
+
+[package.metadata.binstall]
+pkg-url = "{ repo }/releases/download/v{ version }/{ name }-{ target }-v{ version }{ archive-suffix }"
+bin-dir = "{ name }-{ target }-v{ version }/{ bin }{ binary-ext }"
+pkg-fmt = "tgz"
+disabled-strategies = ["quick-install", "compile"]
+
+[package.metadata.binstall.overrides.x86_64-pc-windows-msvc]
+pkg-fmt = "zip"
+
+[package.metadata.binstall.overrides.aarch64-pc-windows-msvc]
+pkg-fmt = "zip"

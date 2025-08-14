@@ -1,10 +1,11 @@
 use crate::types::{Direction, TestCase, TestSuite};
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use serde::Deserialize;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::PathBuf;
 use walkdir::WalkDir;
+
 #[derive(Debug, Deserialize, Clone, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum BackendChoice {
@@ -13,19 +14,22 @@ pub enum BackendChoice {
     Hfst,
     Foma,
 }
+
 #[derive(Debug, Deserialize, Clone)]
 #[serde(rename_all = "PascalCase")]
 pub struct HfstCfg {
-    pub gen: Option<String>,
+    pub r#gen: Option<String>,
     pub morph: Option<String>,
 }
+
 #[derive(Debug, Deserialize, Clone)]
 #[serde(rename_all = "PascalCase")]
 pub struct FomaCfg {
-    pub gen: Option<String>,
+    pub r#gen: Option<String>,
     pub morph: Option<String>,
     pub app: Option<String>, // default: flookup
 }
+
 // Godtek alias for bakoverkompatibilitet
 #[derive(Debug, Deserialize, Clone)]
 pub struct RawConfig {
@@ -34,18 +38,21 @@ pub struct RawConfig {
     #[serde(alias = "Foma", alias = "xerox", alias = "Xerox")]
     pub foma: Option<FomaCfg>,
 }
+
 #[derive(Debug, Deserialize, Clone)]
 #[serde(untagged)]
 pub enum OneOrMany {
     One(String),
     Many(Vec<String>),
 }
+
 #[derive(Debug, Deserialize, Clone)]
 #[serde(rename_all = "PascalCase")]
 pub struct RawSpec {
     pub config: Option<RawConfig>,
     pub tests: BTreeMap<String, BTreeMap<String, OneOrMany>>,
 }
+
 #[derive(Debug, Clone)]
 pub struct SuiteWithConfig {
     pub suite: TestSuite,
@@ -54,9 +61,11 @@ pub struct SuiteWithConfig {
     pub gen_fst: String,
     pub morph_fst: Option<String>,
 }
+
 fn trim_owned(s: &str) -> String {
     s.trim().to_string()
 }
+
 pub fn load_specs(paths: &[PathBuf], prefer: BackendChoice) -> Result<Vec<SuiteWithConfig>> {
     let mut files = Vec::new();
     for p in paths {
@@ -143,6 +152,7 @@ pub fn load_specs(paths: &[PathBuf], prefer: BackendChoice) -> Result<Vec<SuiteW
     }
     Ok(out)
 }
+
 fn resolve_backend(
     raw: &RawSpec,
     prefer: &BackendChoice,
@@ -155,9 +165,9 @@ fn resolve_backend(
         BackendChoice::Hfst => BackendChoice::Hfst,
         BackendChoice::Foma => BackendChoice::Foma,
         BackendChoice::Auto => {
-            if cfg.hfst.as_ref().and_then(|h| h.gen.clone()).is_some() {
+            if cfg.hfst.as_ref().and_then(|h| h.r#gen.clone()).is_some() {
                 BackendChoice::Hfst
-            } else if cfg.foma.as_ref().and_then(|x| x.gen.clone()).is_some() {
+            } else if cfg.foma.as_ref().and_then(|x| x.r#gen.clone()).is_some() {
                 BackendChoice::Foma
             } else {
                 return Err(anyhow!("Fann verken HFST.Gen eller Foma.Gen i Config"));
@@ -170,25 +180,25 @@ fn resolve_backend(
                 .hfst
                 .as_ref()
                 .ok_or_else(|| anyhow!("Config.hfst manglar"))?;
-            let gen = h
-                .gen
+            let gen_ = h
+                .r#gen
                 .clone()
                 .ok_or_else(|| anyhow!("Config.hfst.Gen manglar"))?;
-            let gen = gen.trim().to_string();
+            let gen_ = gen_.trim().to_string();
             let morph = h.morph.clone().map(|m| m.trim().to_string());
             let cmd = "hfst-optimised-lookup".to_string();
-            Ok((BackendChoice::Hfst, cmd, gen, morph))
+            Ok((BackendChoice::Hfst, cmd, gen_, morph))
         }
         BackendChoice::Foma => {
             let x = cfg
                 .foma
                 .as_ref()
                 .ok_or_else(|| anyhow!("Config.foma manglar"))?;
-            let gen = x
-                .gen
+            let gen_ = x
+                .r#gen
                 .clone()
                 .ok_or_else(|| anyhow!("Config.foma.Gen manglar"))?;
-            let gen = gen.trim().to_string();
+            let gen_ = gen_.trim().to_string();
             let morph = x.morph.clone().map(|m| m.trim().to_string());
             let cmd = x
                 .app
@@ -196,7 +206,7 @@ fn resolve_backend(
                 .unwrap_or_else(|| "flookup".to_string())
                 .trim()
                 .to_string();
-            Ok((BackendChoice::Foma, cmd, gen, morph))
+            Ok((BackendChoice::Foma, cmd, gen_, morph))
         }
         BackendChoice::Auto => unreachable!(),
     }

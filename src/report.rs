@@ -1,6 +1,7 @@
 use crate::types::{CaseResult, Direction, Summary};
 use colored::Colorize;
 use std::collections::{BTreeMap, BTreeSet};
+
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum OutputKind {
     Normal,
@@ -8,21 +9,25 @@ pub enum OutputKind {
     Terse,
     Final,
 }
+
 fn parse_group(name: &str) -> (&str, &str) {
     match name.split_once(": ") {
         Some((g, rest)) => (g, rest),
         None => (name, ""),
     }
 }
+
 fn mode_label(dir: &Direction) -> &'static str {
     match dir {
         Direction::Generate => "Lexical/Generation",
         Direction::Analyze => "Surface/Analysis",
     }
 }
+
 fn dash_line(width: usize) -> String {
     "-".repeat(width)
 }
+
 // Bygg blokker (gruppering per (gruppe, retning)) i encounter-ordning
 fn build_blocks<'a>(
     cases: &'a [CaseResult],
@@ -52,6 +57,7 @@ fn build_blocks<'a>(
     let seq: Vec<(String, Direction)> = order.into_iter().map(|k| (k.group, k.dir)).collect();
     (seq, groups)
 }
+
 // Intern: normal-formatet (dagens format)
 fn print_human_normal(
     summary: &Summary,
@@ -177,6 +183,7 @@ fn print_human_normal(
         test_idx += 1;
     }
 }
+
 // Nytt: compact-format
 fn print_human_compact(summary: &Summary, ignore_extra_analyses: bool) {
     let (seq, groups) = build_blocks(&summary.cases);
@@ -245,6 +252,7 @@ fn print_human_compact(summary: &Summary, ignore_extra_analyses: bool) {
         total_passes, total_fails, total_checks
     );
 }
+
 // Nytt: terse-format (prikker/utrop for kvar sjekk, éi line per testblokk, og PASS/FAIL til slutt)
 fn print_human_terse(summary: &Summary, ignore_extra_analyses: bool) {
     let (seq, groups) = build_blocks(&summary.cases);
@@ -284,6 +292,7 @@ fn print_human_terse(summary: &Summary, ignore_extra_analyses: bool) {
     }
     println!("{}", if any_fail { "FAIL" } else { "PASS" });
 }
+
 // Nytt: final-format (berre totalsamandrag P/F/T)
 fn print_human_final(summary: &Summary, ignore_extra_analyses: bool) {
     // Summér globalt
@@ -324,6 +333,7 @@ fn print_human_final(summary: &Summary, ignore_extra_analyses: bool) {
     }
     println!("{}/{}/{}", total_passes, total_fails, total_checks);
 }
+
 // Offentleg API: ruter til riktig format
 pub fn print_human(
     summary: &Summary,

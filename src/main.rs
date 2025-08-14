@@ -1,18 +1,20 @@
 use anyhow::Result;
 use clap::{Parser, ValueEnum};
 use colored::control::set_override as set_color_override;
-use morph_test::backend::{ExternalBackend, DEFAULT_TIMEOUT};
+use morph_test::backend::{DEFAULT_TIMEOUT, ExternalBackend};
 use morph_test::engine::run_suites;
-use morph_test::report::{print_human, OutputKind};
-use morph_test::spec::{load_specs, BackendChoice};
+use morph_test::report::{OutputKind, print_human};
+use morph_test::spec::{BackendChoice, load_specs};
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
+
 #[derive(Copy, Clone, Debug, Eq, PartialEq, ValueEnum)]
 enum BackendOpt {
     Auto,
     Hfst,
     Foma,
 }
+
 impl From<BackendOpt> for BackendChoice {
     fn from(v: BackendOpt) -> Self {
         match v {
@@ -49,6 +51,7 @@ struct Cli {
     // TEST_PATHS: ei eller fleire YAML-filer/mapper med testdata
     #[arg(value_name = "TEST_PATHS", required = true)]
     tests: Vec<PathBuf>,
+
     // Backend-val: standard HFST. Alias for bakoverkompatibilitet: -S / --section
     #[arg(
         long,
@@ -59,6 +62,7 @@ struct Cli {
         help = "Vel backend/section (hfst eller foma) [alias: -S/--section]"
     )]
     backend: BackendOpt,
+
     // Overstyr generator-FST
     #[arg(
         long,
@@ -67,6 +71,7 @@ struct Cli {
         help = "Overstyr generator-FST (.hfstol for HFST, .foma for Foma) [alias: --gen]"
     )]
     generator: Option<String>,
+
     // Overstyr analyser-FST
     #[arg(
         long,
@@ -75,6 +80,7 @@ struct Cli {
         help = "Overstyr analyser-FST (.hfstol for HFST, .foma for Foma) [alias: --morph, --analyzer]"
     )]
     analyser: Option<String>,
+
     // Stille-modus
     #[arg(
         short = 'q',
@@ -90,6 +96,7 @@ struct Cli {
         help = "Overstyr lookup-kommando (t.d. hfst-optimised-lookup, flookup) [alias: --app]"
     )]
     lookup_tool: Option<String>,
+
     // Ignorer ekstra analysar i Analyze-modus
     #[arg(
         short = 'i',
@@ -97,6 +104,7 @@ struct Cli {
         help = "Analyze-testar: godkjenn når alle forventa analysar finst, sjølv om det finst ekstra analysar"
     )]
     ignore_extra_analyses: bool,
+
     // Fargekontroll
     #[arg(
         short = 'c',
@@ -104,11 +112,13 @@ struct Cli {
         help = "Tving fargar på (standard er fargar på)"
     )]
     color: bool,
+
     #[arg(
         long = "no-color",
         help = "Slå av fargar i rapporten (overstyrer --color)"
     )]
     no_color: bool,
+
     // Verbose
     #[arg(
         short = 'v',
@@ -116,6 +126,7 @@ struct Cli {
         help = "Vis metadata (lookup med full sti, generator/analyzer med fulle stiar, versjon) og framdriftsmeldingar. Viser òg ‘EXTRA’ for Analyze-PASS når -i er aktiv."
     )]
     verbose: bool,
+
     // Filtrer retning
     #[arg(
         short = 's',
@@ -124,6 +135,7 @@ struct Cli {
         help = "Køyr berre analysetestar (surface form → analyses)"
     )]
     surface: bool,
+
     #[arg(
         short = 'l',
         long = "lexical",
@@ -131,6 +143,7 @@ struct Cli {
         help = "Køyr berre genereringstestar (lexical tags → surface forms)"
     )]
     lexical: bool,
+
     // Filtrering av rapportlinjer
     #[arg(
         short = 'f',
@@ -139,6 +152,7 @@ struct Cli {
         help = "Skjul feil (FAIL), vis berre gjennomgåtte (PASS)"
     )]
     hide_fails: bool,
+
     #[arg(
         short = 'p',
         long = "hide-passes",
@@ -146,6 +160,7 @@ struct Cli {
         help = "Skjul gjennomgåtte (PASS), vis berre feil (FAIL)"
     )]
     hide_passes: bool,
+
     // -t/--test: tal (1..N), full tittel "Gruppe (Lexical/Generation|Surface/Analysis)" eller berre gruppenamnet.
     // Spesial: 0 / null / liste listar alle testar og avsluttar.
     #[arg(
@@ -155,6 +170,7 @@ struct Cli {
         help = "Køyr berre angitt test: nummer 1..N, tittel „Gruppe (Lexical/Generation|Surface/Analysis)” eller berre gruppenamnet frå YAML. Spesial: 0, ‘null’ eller ‘liste’ listar alle tilgjengelege testar og avsluttar."
     )]
     test: Option<String>,
+
     // NYTT: rapportformat
     #[arg(
         short = 'o',
@@ -165,12 +181,14 @@ struct Cli {
     )]
     output: OutputFormat,
 }
+
 fn display_path(path: &str) -> String {
     match std::fs::canonicalize(Path::new(path)) {
         Ok(p) => p.to_string_lossy().into_owned(),
         Err(_) => path.to_string(),
     }
 }
+
 fn resolve_lookup_path(cmd: &str) -> String {
     if cmd.contains(std::path::MAIN_SEPARATOR) || cmd.starts_with("./") || cmd.starts_with(".\\") {
         return display_path(cmd);
@@ -180,18 +198,29 @@ fn resolve_lookup_path(cmd: &str) -> String {
         Err(_) => cmd.to_string(),
     }
 }
+
 fn mode_label(dir: &morph_test::types::Direction) -> &'static str {
     match dir {
         morph_test::types::Direction::Generate => "Lexical/Generation",
         morph_test::types::Direction::Analyze => "Surface/Analysis",
     }
 }
+
 fn group_of_case_name(name: &str) -> &str {
     match name.split_once(": ") {
         Some((g, _)) => g,
         None => name,
     }
 }
+
+// Bygg blokkliste (1-basert) i encounter-ordning over alle suites
+#[derive(Clone)]
+struct BlockRef {
+    suite_idx: usize,
+    group: String,
+    dir: morph_test::types::Direction,
+}
+
 fn main() -> Result<()> {
     let cli = Cli::parse();
     // Fargar: standard på, --no-color slår av
@@ -200,8 +229,10 @@ fn main() -> Result<()> {
     } else {
         set_color_override(true);
     }
+
     // Last suites frå teststiar
     let mut suites = load_specs(&cli.tests, cli.backend.into())?;
+
     // Filtrér retning før vi bygger blokker
     for swc in &mut suites {
         if cli.surface {
@@ -214,14 +245,8 @@ fn main() -> Result<()> {
                 .retain(|c| matches!(c.direction, morph_test::types::Direction::Generate));
         }
     }
+
     suites.retain(|swc| !swc.suite.cases.is_empty());
-    // Bygg blokkliste (1-basert) i encounter-ordning over alle suites
-    #[derive(Clone)]
-    struct BlockRef {
-        suite_idx: usize,
-        group: String,
-        dir: morph_test::types::Direction,
-    }
     let mut blocks: Vec<BlockRef> = Vec::new();
     for (si, swc) in suites.iter().enumerate() {
         let mut seen: HashSet<(String, morph_test::types::Direction)> = HashSet::new();
@@ -237,6 +262,7 @@ fn main() -> Result<()> {
             }
         }
     }
+
     // -t/--test: spesial 0/null/liste => list opp og avslutt
     if let Some(sel) = &cli.test {
         if blocks.is_empty() {
@@ -312,6 +338,7 @@ fn main() -> Result<()> {
         }
         suites.retain(|swc| !swc.suite.cases.is_empty());
     }
+
     let mut aggregate = morph_test::types::Summary::default();
     if cli.verbose && !cli.silent {
         println!(
@@ -329,11 +356,13 @@ fn main() -> Result<()> {
         } else {
             swc.morph_fst.clone()
         };
+
         let effective_lookup = cli
             .lookup_tool
             .clone()
             .map(|s| s.trim().to_string())
             .unwrap_or_else(|| swc.lookup_cmd.clone());
+
         if cli.verbose && !cli.silent {
             let lookup_full = resolve_lookup_path(&effective_lookup);
             let gen_full = display_path(&effective_gen);
@@ -358,6 +387,7 @@ fn main() -> Result<()> {
                 mode_txt
             );
         }
+
         let backend = ExternalBackend {
             lookup_cmd: effective_lookup,
             generator_fst: Some(effective_gen),
@@ -365,13 +395,16 @@ fn main() -> Result<()> {
             timeout: Some(DEFAULT_TIMEOUT),
             quiet: cli.silent,
         };
+
         let summary = run_suites(&backend, &[swc.suite], cli.ignore_extra_analyses);
+
         if cli.verbose && !cli.silent {
             println!(
                 "[INFO] Ferdig: passed {}, failed {}. Skriv rapport...",
                 summary.passed, summary.failed
             );
         }
+
         if !cli.silent {
             print_human(
                 &summary,
@@ -382,19 +415,23 @@ fn main() -> Result<()> {
                 cli.output.into(),
             );
         }
+
         aggregate.total += summary.total;
         aggregate.passed += summary.passed;
         aggregate.failed += summary.failed;
         aggregate.cases.extend(summary.cases);
     }
+
     if cli.verbose && !cli.silent {
         println!(
             "[INFO] Alle testkøyringar ferdige. Total: {}, Passed: {}, Failed: {}",
             aggregate.total, aggregate.passed, aggregate.failed
         );
     }
+
     if aggregate.failed > 0 {
         std::process::exit(1);
     }
+
     Ok(())
 }

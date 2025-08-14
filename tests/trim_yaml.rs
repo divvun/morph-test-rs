@@ -1,7 +1,7 @@
 use anyhow::Result;
 use morph_test::backend::Backend;
 use morph_test::engine::run_suites;
-use morph_test::spec::{load_specs, BackendChoice};
+use morph_test::spec::{BackendChoice, load_specs};
 use std::fs;
 use tempfile::tempdir;
 struct MockGen;

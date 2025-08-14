@@ -2,16 +2,19 @@ use crate::backend::Backend;
 use crate::types::{CaseResult, Direction, Summary, TestSuite};
 use rayon::prelude::*;
 use std::collections::BTreeSet;
+
 fn set_eq(a: &[String], b: &[String]) -> bool {
     let sa: BTreeSet<&str> = a.iter().map(|s| s.as_str()).collect();
     let sb: BTreeSet<&str> = b.iter().map(|s| s.as_str()).collect();
     sa == sb
 }
+
 fn expected_subset_of_actual(actual: &[String], expected: &[String]) -> bool {
     let sa: BTreeSet<&str> = actual.iter().map(|s| s.as_str()).collect();
     let sb: BTreeSet<&str> = expected.iter().map(|s| s.as_str()).collect();
     sb.is_subset(&sa)
 }
+
 pub fn run_suites<B: Backend>(
     backend: &B,
     suites: &[TestSuite],
@@ -23,6 +26,7 @@ pub fn run_suites<B: Backend>(
             all_cases.push((s.name.clone(), c.clone()));
         }
     }
+
     let results: Vec<CaseResult> = all_cases
         .par_iter()
         .map(|(_suite_name, case)| {
@@ -60,6 +64,7 @@ pub fn run_suites<B: Backend>(
             }
         })
         .collect();
+
     let passed = results.iter().filter(|r| r.passed).count();
     let failed = results.len() - passed;
     Summary {

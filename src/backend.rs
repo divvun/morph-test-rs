@@ -1,10 +1,12 @@
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use std::io::Write;
 use std::process::{Command, Stdio};
 use std::time::Duration;
 use wait_timeout::ChildExt;
+
 /// 30 sekund per oppslag
 pub const DEFAULT_TIMEOUT: Duration = Duration::from_secs(30);
+
 /// Generisk backend som køyrer eit eksternt lookup-program (hfst-optimised-lookup, flookup, osb.)
 #[derive(Debug, Clone)]
 pub struct ExternalBackend {
@@ -14,13 +16,16 @@ pub struct ExternalBackend {
     pub timeout: Option<Duration>,
     pub quiet: bool, // demp stderr frå lookup når true
 }
+
 pub trait Backend: Send + Sync {
     fn analyze(&self, input: &str) -> Result<Vec<String>>;
     fn generate(&self, input: &str) -> Result<Vec<String>>;
 }
+
 impl ExternalBackend {
     fn run_lookup(&self, fst: &str, input: &str) -> Result<Vec<String>> {
         let timeout = self.timeout.unwrap_or(DEFAULT_TIMEOUT);
+
         let mut cmd = Command::new(&self.lookup_cmd);
         cmd.arg(fst)
             .stdin(Stdio::piped())
@@ -30,6 +35,7 @@ impl ExternalBackend {
             } else {
                 Stdio::inherit()
             });
+
         let mut child = cmd
             .spawn()
             .with_context(|| format!("Klarte ikkje å starte '{}'", self.lookup_cmd))?;
@@ -42,6 +48,7 @@ impl ExternalBackend {
             stdin.write_all(input_trimmed.as_bytes())?;
             stdin.write_all(b"\n")?;
         }
+
         match child.wait_timeout(timeout)? {
             Some(status) => {
                 if !status.success() {
@@ -54,10 +61,12 @@ impl ExternalBackend {
                 return Err(anyhow!("Lookup tidsavbrot etter {} s", timeout.as_secs()));
             }
         }
+
         let out = child.wait_with_output()?;
         if !out.status.success() {
             return Err(anyhow!("Lookup-prosess feila med status {}", out.status));
         }
+
         let stdout = String::from_utf8_lossy(&out.stdout);
         let mut results = Vec::new();
         for raw_line in stdout.lines() {
@@ -79,6 +88,7 @@ impl ExternalBackend {
         Ok(results)
     }
 }
+
 impl Backend for ExternalBackend {
     fn analyze(&self, input: &str) -> Result<Vec<String>> {
         let fst = self
@@ -87,6 +97,7 @@ impl Backend for ExternalBackend {
             .ok_or_else(|| anyhow!("Analyzer-FST ikkje sett"))?;
         self.run_lookup(fst, input)
     }
+
     fn generate(&self, input: &str) -> Result<Vec<String>> {
         let fst = self
             .generator_fst
