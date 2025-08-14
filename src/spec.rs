@@ -52,6 +52,12 @@ pub struct SuiteWithConfig {
     pub gen_fst: String,
     pub morph_fst: Option<String>,
 }
+fn trim_owned(s: &str) -> String {
+    s.trim().to_string()
+}
+fn trim_vec(v: Vec<String>) -> Vec<String> {
+    v.into_iter().map(|s| s.trim().to_string()).collect()
+}
 pub fn load_specs(paths: &[PathBuf], prefer: BackendChoice) -> Result<Vec<SuiteWithConfig>> {
     let mut files = Vec::new();
     for p in paths {
@@ -81,16 +87,18 @@ pub fn load_specs(paths: &[PathBuf], prefer: BackendChoice) -> Result<Vec<SuiteW
             .with_context(|| format!("Mangelfull eller utydeleg Config i {}", f.display()))?;
         let mut cases = Vec::new();
         for (group, map) in &raw.Tests {
+            let group_name = group.trim(); // trim gruppenamn òg
             for (input, expected) in map {
+                let input_trim = input.trim().to_string();
                 let expect_vec = match expected {
-                    OneOrMany::One(s) => vec![s.clone()],
-                    OneOrMany::Many(v) => v.clone(),
+                    OneOrMany::One(s) => vec![trim_owned(s)],
+                    OneOrMany::Many(v) => v.iter().map(|s| s.trim().to_string()).collect(),
                 };
-                let name = format!("{}: {}", group, input);
+                let name = format!("{}: {}", group_name, &input_trim);
                 cases.push(TestCase {
                     name,
                     direction: Direction::Generate,
-                    input: input.clone(),
+                    input: input_trim,
                     expect: expect_vec,
                 });
             }
@@ -115,7 +123,6 @@ fn resolve_backend(raw: &RawSpec, prefer: &BackendChoice)
     -> Result<(BackendChoice, String, String, Option<String>)>
 {
     let cfg = raw.Config.as_ref().ok_or_else(|| anyhow::anyhow!("Config manglar"))?;
-    // Vel backend: preferert, elles HFST om tilgjengeleg, elles Xerox.
     let chosen = match prefer {
         BackendChoice::Hfst => BackendChoice::Hfst,
         BackendChoice::Xerox => BackendChoice::Xerox,
@@ -133,15 +140,18 @@ fn resolve_backend(raw: &RawSpec, prefer: &BackendChoice)
         BackendChoice::Hfst => {
             let h = cfg.hfst.as_ref().ok_or_else(|| anyhow::anyhow!("Config.hfst manglar"))?;
             let gen = h.Gen.clone().ok_or_else(|| anyhow::anyhow!("Config.hfst.Gen manglar"))?;
-            // Default kommando for HFST-lookup
+            let gen = gen.trim().to_string();
+            let morph = h.Morph.clone().map(|m| m.trim().to_string());
             let cmd = "hfst-lookup".to_string();
-            Ok((BackendChoice::Hfst, cmd, gen, h.Morph.clone()))
+            Ok((BackendChoice::Hfst, cmd, gen, morph))
         }
         BackendChoice::Xerox => {
             let x = cfg.xerox.as_ref().ok_or_else(|| anyhow::anyhow!("Config.xerox manglar"))?;
             let gen = x.Gen.clone().ok_or_else(|| anyhow::anyhow!("Config.xerox.Gen manglar"))?;
-            let cmd = x.App.clone().unwrap_or_else(|| "lookup".to_string());
-            Ok((BackendChoice::Xerox, cmd, gen, x.Morph.clone()))
+            let gen = gen.trim().to_string();
+            let morph = x.Morph.clone().map(|m| m.trim().to_string());
+            let cmd = x.App.clone().unwrap_or_else(|| "lookup".to_string()).trim().to_string();
+            Ok((BackendChoice::Xerox, cmd, gen, morph))
         }
         BackendChoice::Auto => unreachable!(),
     }
