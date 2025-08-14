@@ -111,12 +111,13 @@ struct Cli {
         help = "Skjul gjennomgåtte (PASS), vis berre feil (FAIL)"
     )]
     hide_passes: bool,
-    // NYTT: køyre berre éin test eller alle for ei gruppe (1-basert nummer, full tittel, eller berre gruppenamn frå YAML)
+    // -t/--test: tal (1..N), full tittel "Gruppe (Lexical/Generation|Surface/Analysis)" eller berre gruppenamnet.
+    // Spesial: 0 / null / liste listar alle testar og avsluttar.
     #[arg(
         short = 't',
         long = "test",
         value_name = "TEST",
-        help = "Køyr berre angitt test: nummer 1..N, tittel „Gruppe (Lexical/Generation|Surface/Analysis)” eller berre gruppenamnet frå YAML"
+        help = "Køyr berre angitt test: nummer 1..N, tittel „Gruppe (Lexical/Generation|Surface/Analysis)” eller berre gruppenamnet frå YAML. Spesial: 0, ‘null’ eller ‘liste’ listar alle tilgjengelege testar og avsluttar."
     )]
     test: Option<String>,
 }
@@ -193,13 +194,24 @@ fn main() -> Result<()> {
             }
         }
     }
-    // Om -t/--test er spesifisert: vel ut berre denne testen (tal, full tittel, eller berre gruppenamn)
+    // Om -t/--test er spesifisert: spesialtilfelle eller val av blokk(er)
     if let Some(sel) = &cli.test {
         if blocks.is_empty() {
             eprintln!("Ingen testar tilgjengeleg etter filtrering.");
             std::process::exit(2);
         }
         let trimmed = sel.trim();
+        // Spesial: 0 / null / liste => list opp og exit(0)
+        if trimmed == "0"
+            || trimmed.eq_ignore_ascii_case("null")
+            || trimmed.eq_ignore_ascii_case("liste")
+        {
+            println!("Tilgjengelege testar (1-basert):");
+            for (idx, b) in blocks.iter().enumerate() {
+                println!("  {}: {} ({})", idx + 1, b.group, mode_label(&b.dir));
+            }
+            return Ok(());
+        }
         let mut selected: Vec<BlockRef> = Vec::new();
         // 1) Tal (1-basert)
         if let Ok(n) = trimmed.parse::<usize>() {
@@ -209,6 +221,10 @@ fn main() -> Result<()> {
                     n,
                     blocks.len()
                 );
+                eprintln!("Tilgjengelege testar (1-basert):");
+                for (idx, b) in blocks.iter().enumerate() {
+                    eprintln!("  {}: {} ({})", idx + 1, b.group, mode_label(&b.dir));
+                }
                 std::process::exit(2);
             }
             selected.push(blocks[n - 1].clone());
