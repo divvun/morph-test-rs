@@ -28,6 +28,12 @@ fn dash_line(width: usize) -> String {
     "-".repeat(width)
 }
 
+#[derive(PartialEq, Eq, PartialOrd, Ord)]
+struct Key {
+    group: String,
+    dir: Direction,
+}
+
 // Bygg blokker (gruppering per (gruppe, retning)) i encounter-ordning
 #[allow(clippy::type_complexity)]
 fn build_blocks(
@@ -36,11 +42,6 @@ fn build_blocks(
     Vec<(String, Direction)>,
     BTreeMap<(String, Direction), Vec<&CaseResult>>,
 ) {
-    #[derive(PartialEq, Eq, PartialOrd, Ord)]
-    struct Key {
-        group: String,
-        dir: Direction,
-    }
     let mut order: Vec<Key> = Vec::new();
     let mut groups: BTreeMap<(String, Direction), Vec<&CaseResult>> = BTreeMap::new();
     for c in cases {
