@@ -49,12 +49,21 @@ struct Cli {
         help = "Overstyr analyser-FST (.hfstol for HFST, .foma for Foma) [alias: --morph, --analyzer]"
     )]
     analyser: Option<String>,
+    // Stille-modus
     #[arg(
         short = 'q',
         long = "silent",
         help = "Stille modus: ingen utskrift, og demp stderr frå lookup"
     )]
     silent: bool,
+    // Overstyr lookup-kommandoen (alias --app for YAML-kompat)
+    #[arg(
+        long = "lookup-tool",
+        value_name = "CMD",
+        visible_alias = "app",
+        help = "Overstyr lookup-kommando (t.d. hfst-optimised-lookup, flookup) [alias: --app]"
+    )]
+    lookup_tool: Option<String>,
 }
 fn main() -> Result<()> {
     // Rayon brukar all CPU-kjernar som standard (maks parallellitet).
@@ -73,12 +82,18 @@ fn main() -> Result<()> {
         } else {
             swc.morph_fst.clone()
         };
+        // Overstyr lookup-verktøy dersom oppgitt
+        let effective_lookup = if let Some(tool) = &cli.lookup_tool {
+            tool.trim().to_string()
+        } else {
+            swc.lookup_cmd.clone()
+        };
         let backend = ExternalBackend {
-            lookup_cmd: swc.lookup_cmd.clone(),
+            lookup_cmd: effective_lookup,
             generator_fst: Some(effective_gen),
             analyzer_fst: effective_morph,
             timeout: Some(DEFAULT_TIMEOUT),
-            quiet: cli.silent, // <- ny
+            quiet: cli.silent,
         };
         let summary = run_suites(&backend, &[swc.suite]);
         // Berre skriv rapport dersom ikkje stille modus
