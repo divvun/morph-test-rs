@@ -31,11 +31,14 @@ impl From<BackendOpt> for BackendChoice {
 struct Cli {
     #[arg(value_name = "TEST_PATHS", required = true)]
     tests: Vec<PathBuf>,
+    // Backend-val: standard HFST. Alias for bakoverkompatibilitet: -S / --section
     #[arg(
         long,
         value_enum,
         default_value = "hfst",
-        help = "Vel backend (hfst eller foma)"
+        visible_short_alias = 'S',
+        visible_alias = "section",
+        help = "Vel backend/section (hfst eller foma) [alias: -S/--section]"
     )]
     backend: BackendOpt,
     #[arg(
