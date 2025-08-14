@@ -111,12 +111,12 @@ struct Cli {
         help = "Skjul gjennomgåtte (PASS), vis berre feil (FAIL)"
     )]
     hide_passes: bool,
-    // NYTT: køyre berre éin testblokk (1-basert nummer eller tittel "Gruppe (Lexical/Generation|Surface/Analysis)")
+    // NYTT: køyre berre éin test eller alle for ei gruppe (1-basert nummer, full tittel, eller berre gruppenamn frå YAML)
     #[arg(
         short = 't',
         long = "test",
         value_name = "TEST",
-        help = "Køyr berre angitt test (nummer 1..N, eller tittel „Gruppe (Lexical/Generation|Surface/Analysis)”)"
+        help = "Køyr berre angitt test: nummer 1..N, tittel „Gruppe (Lexical/Generation|Surface/Analysis)” eller berre gruppenamnet frå YAML"
     )]
     test: Option<String>,
 }
@@ -184,7 +184,7 @@ fn main() -> Result<()> {
         for c in &swc.suite.cases {
             let g = group_of_case_name(&c.name).to_string();
             let key = (g.clone(), c.direction.clone());
-            if seen.insert(key.clone()) {
+            if seen.insert(key) {
                 blocks.push(BlockRef {
                     suite_idx: si,
                     group: g,
@@ -193,14 +193,16 @@ fn main() -> Result<()> {
             }
         }
     }
-    // Om -t/--test er spesifisert: vel ut berre denne blokka
+    // Om -t/--test er spesifisert: vel ut berre denne testen (tal, full tittel, eller berre gruppenamn)
     if let Some(sel) = &cli.test {
         if blocks.is_empty() {
             eprintln!("Ingen testar tilgjengeleg etter filtrering.");
             std::process::exit(2);
         }
-        let mut selected: Option<BlockRef> = None;
-        if let Ok(n) = sel.parse::<usize>() {
+        let trimmed = sel.trim();
+        let mut selected: Vec<BlockRef> = Vec::new();
+        // 1) Tal (1-basert)
+        if let Ok(n) = trimmed.parse::<usize>() {
             if n == 0 || n > blocks.len() {
                 eprintln!(
                     "Ugyldig testnummer {}. Gyldig område: 1..{}.",
@@ -209,34 +211,48 @@ fn main() -> Result<()> {
                 );
                 std::process::exit(2);
             }
-            selected = Some(blocks[n - 1].clone());
+            selected.push(blocks[n - 1].clone());
         } else {
-            // Forvent full tittel "Gruppe (Lexical/Generation|Surface/Analysis)"
+            // 2) Eksakt tittel "Gruppe (Lexical/Generation|Surface/Analysis)"
             for b in &blocks {
                 let title = format!("{} ({})", b.group, mode_label(&b.dir));
-                if title == *sel {
-                    selected = Some(b.clone());
-                    break;
+                if title == trimmed {
+                    selected.push(b.clone());
                 }
             }
-            if selected.is_none() {
-                eprintln!("Fann ikkje test med tittel: {}", sel);
-                eprintln!("Tilgjengelege testar:");
+            // 3) Berre gruppenamn (ID frå YAML): vel alle blokker som matchar denne gruppa
+            if selected.is_empty() {
+                for b in &blocks {
+                    if b.group == trimmed {
+                        selected.push(b.clone());
+                    }
+                }
+            }
+            if selected.is_empty() {
+                eprintln!("Fann ikkje test med ID/tittel: {}", trimmed);
+                eprintln!("Tilgjengelege testar (1-basert):");
                 for (idx, b) in blocks.iter().enumerate() {
                     eprintln!("  {}: {} ({})", idx + 1, b.group, mode_label(&b.dir));
                 }
                 std::process::exit(2);
             }
         }
-        // Behald berre den valde blokka
-        let chosen = selected.unwrap();
+        // Filtrer suites til berre dei valde blokkene
         for (si, swc) in suites.iter_mut().enumerate() {
-            if si != chosen.suite_idx {
+            // Samle alle (group, dir) for denne suite_idx
+            let allowed: Vec<(String, morph_test::types::Direction)> = selected
+                .iter()
+                .filter(|b| b.suite_idx == si)
+                .map(|b| (b.group.clone(), b.dir.clone()))
+                .collect();
+            if allowed.is_empty() {
                 swc.suite.cases.clear();
                 continue;
             }
             swc.suite.cases.retain(|c| {
-                group_of_case_name(&c.name) == chosen.group && c.direction == chosen.dir
+                allowed
+                    .iter()
+                    .any(|(g, d)| group_of_case_name(&c.name) == g && &c.direction == d)
             });
         }
         suites.retain(|swc| !swc.suite.cases.is_empty());
