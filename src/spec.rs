@@ -1,5 +1,5 @@
 use crate::types::{Direction, TestCase, TestSuite};
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use serde::Deserialize;
 use std::collections::BTreeMap;
 use std::fs;
@@ -11,7 +11,7 @@ pub enum BackendChoice {
     #[default]
     Auto,
     Hfst,
-    Xerox,
+    Foma,
 }
 #[derive(Debug, Deserialize, Clone)]
 #[serde(rename_all = "PascalCase")]
@@ -21,16 +21,19 @@ pub struct HfstCfg {
 }
 #[derive(Debug, Deserialize, Clone)]
 #[serde(rename_all = "PascalCase")]
-pub struct XeroxCfg {
+pub struct FomaCfg {
     pub gen: Option<String>,
     pub morph: Option<String>,
-    pub app: Option<String>, // t.d. "lookup"
+    pub app: Option<String>, // default: flookup
 }
+// Merk: utan rename_all her for å kunne treffe både "hfst"/"Hfst" og "foma"/"Foma".
+// Vi godtek òg "xerox"/"Xerox" som alias for foma (bakoverkompatibilitet).
 #[derive(Debug, Deserialize, Clone)]
-#[serde(rename_all = "PascalCase")]
 pub struct RawConfig {
+    #[serde(alias = "Hfst")]
     pub hfst: Option<HfstCfg>,
-    pub xerox: Option<XeroxCfg>,
+    #[serde(alias = "Foma", alias = "xerox", alias = "Xerox")]
+    pub foma: Option<FomaCfg>,
 }
 #[derive(Debug, Deserialize, Clone)]
 #[serde(untagged)]
@@ -124,20 +127,17 @@ fn resolve_backend(
     let cfg = raw
         .config
         .as_ref()
-        .ok_or_else(|| anyhow::anyhow!("Config manglar"))?;
-    // Vel backend: preferert, elles HFST om tilgjengeleg, elles Xerox.
+        .ok_or_else(|| anyhow!("Config manglar"))?;
     let chosen = match prefer {
         BackendChoice::Hfst => BackendChoice::Hfst,
-        BackendChoice::Xerox => BackendChoice::Xerox,
+        BackendChoice::Foma => BackendChoice::Foma,
         BackendChoice::Auto => {
             if cfg.hfst.as_ref().and_then(|h| h.gen.clone()).is_some() {
                 BackendChoice::Hfst
-            } else if cfg.xerox.as_ref().and_then(|x| x.gen.clone()).is_some() {
-                BackendChoice::Xerox
+            } else if cfg.foma.as_ref().and_then(|x| x.gen.clone()).is_some() {
+                BackendChoice::Foma
             } else {
-                return Err(anyhow::anyhow!(
-                    "Fann verken HFST.Gen eller Xerox.Gen i Config"
-                ));
+                return Err(anyhow!("Fann verken HFST.Gen eller Foma.Gen i Config"));
             }
         }
     };
@@ -146,34 +146,33 @@ fn resolve_backend(
             let h = cfg
                 .hfst
                 .as_ref()
-                .ok_or_else(|| anyhow::anyhow!("Config.hfst manglar"))?;
+                .ok_or_else(|| anyhow!("Config.hfst manglar"))?;
             let gen = h
                 .gen
                 .clone()
-                .ok_or_else(|| anyhow::anyhow!("Config.hfst.Gen manglar"))?;
+                .ok_or_else(|| anyhow!("Config.hfst.Gen manglar"))?;
             let gen = gen.trim().to_string();
             let morph = h.morph.clone().map(|m| m.trim().to_string());
             let cmd = "hfst-optimised-lookup".to_string();
             Ok((BackendChoice::Hfst, cmd, gen, morph))
         }
-        BackendChoice::Xerox => {
-            let x = cfg
-                .xerox
-                .as_ref()
-                .ok_or_else(|| anyhow::anyhow!("Config.xerox manglar"))?;
+        BackendChoice::Foma => {
+            let x = cfg.foma.as_ref().ok_or_else(|| {
+                anyhow!("Config.foma manglar (eller brukte du 'xerox' utan alias?)")
+            })?;
             let gen = x
                 .gen
                 .clone()
-                .ok_or_else(|| anyhow::anyhow!("Config.xerox.Gen manglar"))?;
+                .ok_or_else(|| anyhow!("Config.foma.Gen manglar"))?;
             let gen = gen.trim().to_string();
             let morph = x.morph.clone().map(|m| m.trim().to_string());
             let cmd = x
                 .app
                 .clone()
-                .unwrap_or_else(|| "lookup".to_string())
+                .unwrap_or_else(|| "flookup".to_string())
                 .trim()
                 .to_string();
-            Ok((BackendChoice::Xerox, cmd, gen, morph))
+            Ok((BackendChoice::Foma, cmd, gen, morph))
         }
         BackendChoice::Auto => unreachable!(),
     }

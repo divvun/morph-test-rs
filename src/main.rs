@@ -9,14 +9,14 @@ use std::path::PathBuf;
 enum BackendOpt {
     Auto,
     Hfst,
-    Xerox,
+    Foma,
 }
 impl From<BackendOpt> for BackendChoice {
     fn from(v: BackendOpt) -> Self {
         match v {
             BackendOpt::Auto => BackendChoice::Auto,
             BackendOpt::Hfst => BackendChoice::Hfst,
-            BackendOpt::Xerox => BackendChoice::Xerox,
+            BackendOpt::Foma => BackendChoice::Foma,
         }
     }
 }
@@ -25,22 +25,22 @@ impl From<BackendOpt> for BackendChoice {
 struct Cli {
     #[arg(value_name = "TEST_PATHS", required = true)]
     tests: Vec<PathBuf>,
-    // standard no er hfst
+    // Standard: HFST med hfst-optimised-lookup
     #[arg(
         long,
         value_enum,
         default_value = "hfst",
-        help = "Vel backend (standard: hfst med hfst-optimised-lookup)"
+        help = "Vel backend (hfst eller foma)"
     )]
     backend: BackendOpt,
     #[arg(
         long,
         alias = "gen",
         value_name = "FILE",
-        help = "Overstyr generator-FST (t.d. .hfstol/.xfst)"
+        help = "Overstyr generator-FST (.hfstol for HFST, .foma for Foma)"
     )]
     generator: Option<String>,
-    #[arg(long, aliases = ["analyzer", "morph"], value_name = "FILE", help = "Overstyr analyser-FST (t.d. .hfstol/.xfst)")]
+    #[arg(long, aliases = ["analyzer", "morph"], value_name = "FILE", help = "Overstyr analyser-FST (.hfstol for HFST, .foma for Foma)")]
     analyser: Option<String>,
 }
 fn main() -> Result<()> {
