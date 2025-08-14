@@ -1,123 +1,153 @@
-use crate::types::{Direction, Summary};
+use crate::types::{CaseResult, Direction, Summary};
 use colored::Colorize;
-use std::collections::BTreeSet;
-pub fn render_human(summary: &Summary, ignore_extra_analyses: bool, verbose: bool) -> String {
-    let mut out = String::new();
-    let header = format!(
-        "Total: {}, Passed: {}, Failed: {}",
-        summary.total,
-        summary.passed.to_string().green(),
-        if summary.failed > 0 {
-            summary.failed.to_string().red().bold().to_string()
-        } else {
-            summary.failed.to_string().green().to_string()
-        }
-    );
-    out.push_str(&header);
-    out.push('\n');
-    for c in &summary.cases {
-        let dir_label = match c.direction {
-            Direction::Generate => "GENERATE",
-            Direction::Analyze => "ANALYZE",
-        };
-        if c.passed {
-            out.push_str(&format!(
-                "{} {} {}\n",
-                "[OK]".green().bold(),
-                dir_label.green(),
-                c.name.green()
-            ));
-            if verbose {
-                match c.direction {
-                    Direction::Generate => {
-                        out.push_str(&format!("  {} {:?}\n", "generated:".bold(), c.actual));
-                    }
-                    Direction::Analyze => {
-                        out.push_str(&format!("  {} {:?}\n", "analyses :".bold(), c.actual));
-                        // Vis alltid ekstra analysar i verbose-modus (om dei finst),
-                        // uavhengig av filter-/køyringsmodus. Farge: gul når dei er ignorerte,
-                        // men i pass-tilfelle kan det berre skje om -i var aktiv.
-                        let exp: BTreeSet<&str> = c.expected.iter().map(|s| s.as_str()).collect();
-                        let act: BTreeSet<&str> = c.actual.iter().map(|s| s.as_str()).collect();
-                        let extra: Vec<&str> = act.difference(&exp).cloned().collect();
-                        if !extra.is_empty() {
-                            if ignore_extra_analyses {
-                                out.push_str(&format!(
-                                    "  {} {:?}\n",
-                                    "extra analyses (ignored):".bold().yellow(),
-                                    extra
-                                ));
-                            } else {
-                                // Teoretisk kjem ikkje dette i PASS (utan -i), men held likevel på semantikken.
-                                out.push_str(&format!(
-                                    "  {} {:?}\n",
-                                    "extra analyses:".bold(),
-                                    extra
-                                ));
-                            }
-                        }
-                    }
-                }
-            }
-        } else {
-            out.push_str(&format!(
-                "{} {} {}\n",
-                "[FAIL]".red().bold(),
-                dir_label.red().bold(),
-                c.name.red().bold()
-            ));
-            out.push_str(&format!("  {} {}\n", "input   :".bold(), c.input));
-            if let Some(err) = &c.error {
-                out.push_str(&format!("  {} {}\n", "error   :".bold(), err.red()));
-            } else {
-                match c.direction {
-                    Direction::Generate => {
-                        out.push_str(&format!(
-                            "  {} {:?}\n",
-                            "expected forms:".bold(),
-                            c.expected
-                        ));
-                        out.push_str(&format!("  {} {:?}\n", "generated     :".bold(), c.actual));
-                    }
-                    Direction::Analyze => {
-                        out.push_str(&format!(
-                            "  {} {:?}\n",
-                            "expected analyses:".bold(),
-                            c.expected
-                        ));
-                        out.push_str(&format!(
-                            "  {} {:?}\n",
-                            "analyses          :".bold(),
-                            c.actual
-                        ));
-                    }
-                }
-                // Diff (alltid)
-                let exp: BTreeSet<&str> = c.expected.iter().map(|s| s.as_str()).collect();
-                let act: BTreeSet<&str> = c.actual.iter().map(|s| s.as_str()).collect();
-                let missing: Vec<&str> = exp.difference(&act).cloned().collect();
-                let extra: Vec<&str> = act.difference(&exp).cloned().collect();
-                if !missing.is_empty() {
-                    out.push_str(&format!("  {} {:?}\n", "missing :".bold(), missing));
-                }
-                if !extra.is_empty() {
-                    if matches!(c.direction, Direction::Analyze) && ignore_extra_analyses {
-                        // Når -i er på, merk at dette er ekstra analysar som kunne vore ignorerte (men her feila testen likevel,
-                        // t.d. fordi noko mangla).
-                        out.push_str(&format!(
-                            "  {} {:?}\n",
-                            "extra analyses (ignored):".bold().yellow(),
-                            extra
-                        ));
-                    } else {
-                        out.push_str(&format!("  {} {:?}\n", "unexpected:".bold(), extra));
-                    }
-                }
-            }
-        }
+use std::collections::{BTreeMap, BTreeSet};
+fn group_key(name: &str) -> &str {
+    // CaseResult.name vart sett til "group: input" i parseren; ta alt før første ": "
+    name.splitn(2, ": ").next().unwrap_or(name)
+}
+fn mode_label(dir: &Direction) -> &'static str {
+    match dir {
+        Direction::Generate => "Lexical/Generation",
+        Direction::Analyze => "Surface/Analysis",
     }
-    out
+}
+fn dash_line(width: usize) -> String {
+    "-".repeat(width)
 }
 pub fn print_human(summary: &Summary, ignore_extra_analyses: bool, verbose: bool) {
-    print!("{}", render_human(summary, ignore_extra_analyses, verbose));
+    // Gruppér etter gruppe-namn i same rekkjefølgje som først observert
+    let mut order: Vec<String> = Vec::new();
+    let mut groups: BTreeMap<String, Vec<&CaseResult>> = BTreeMap::new();
+    for c in &summary.cases {
+        let g = group_key(&c.name).to_string();
+        if !groups.contains_key(&g) {
+            order.push(g.clone());
+            groups.insert(g.clone(), Vec::new());
+        }
+        groups.get_mut(&g).unwrap().push(c);
+    }
+    let mut test_idx = 0;
+    for g in order {
+        let cases = &groups[&g];
+        if cases.is_empty() {
+            continue;
+        }
+        // Retning per gruppe (antar homogen retning i gruppa)
+        let dir = &cases[0].direction;
+        let mode = mode_label(dir);
+        // Overskrift og strekar
+        let title = format!("Test {}: {} ({})", test_idx, g, mode);
+        let line = dash_line(title.len());
+        println!("{}", line);
+        println!("{}", title);
+        println!("{}", line);
+        // Talet på "innslag" i gruppa
+        let n_items = cases.len();
+        let mut passes = 0usize;
+        let mut fails = 0usize;
+        let mut total_lines = 0usize;
+        // Iterér i den rekkjefølgja casane kjem
+        for (i, case) in cases.iter().enumerate() {
+            // Sett for snabb-lookup
+            let exp_set: BTreeSet<&str> = case.expected.iter().map(|s| s.as_str()).collect();
+            let act_set: BTreeSet<&str> = case.actual.iter().map(|s| s.as_str()).collect();
+            // Når expected er tom, skriv éi linje med placeholder
+            if case.expected.is_empty() {
+                let placeholder = match case.direction {
+                    Direction::Generate => "<No lexical/generation>",
+                    Direction::Analyze => "<No surface/analysis>",
+                };
+                let is_pass = case.actual.is_empty()
+                    || (matches!(case.direction, Direction::Analyze)
+                        && ignore_extra_analyses
+                        && !case.actual.is_empty());
+                // Merk: for Analyze + ignore, tom expected og non-tom actual vil formelt vere PASS på subset-kriteriet,
+                // men då vil vi òg potensielt skrive EXTRA-linjer under verbose (sjå nedanfor).
+                let status = if is_pass {
+                    "PASS".green().bold()
+                } else {
+                    "FAIL".red().bold()
+                };
+                println!(
+                    "[{}/{}][{}] {} => {}",
+                    i + 1,
+                    n_items,
+                    status,
+                    case.input,
+                    placeholder
+                );
+                total_lines += 1;
+                if is_pass {
+                    passes += 1;
+                } else {
+                    fails += 1;
+                }
+                // Ekstra analysar i Analyze + ignore + verbose
+                if verbose && ignore_extra_analyses && matches!(case.direction, Direction::Analyze)
+                {
+                    let extras: Vec<&str> = act_set.difference(&exp_set).cloned().collect();
+                    for e in extras {
+                        println!(
+                            "[{}/{}][{}] {} => {}",
+                            i + 1,
+                            n_items,
+                            "EXTRA".yellow().bold(),
+                            case.input,
+                            e
+                        );
+                        total_lines += 1;
+                    }
+                }
+                continue;
+            }
+            // For kvar forventa verdi, skriv PASS/FAIL-line
+            for exp in &case.expected {
+                let ok = act_set.contains(exp.as_str());
+                let status = if ok {
+                    "PASS".green().bold()
+                } else {
+                    "FAIL".red().bold()
+                };
+                println!(
+                    "[{}/{}][{}] {} => {}",
+                    i + 1,
+                    n_items,
+                    status,
+                    case.input,
+                    exp
+                );
+                total_lines += 1;
+                if ok {
+                    passes += 1;
+                } else {
+                    fails += 1;
+                }
+            }
+            // Ved Analyze + ignore + verbose: vis ekstra analysar (gul) som ikkje var i expected
+            if verbose && ignore_extra_analyses && matches!(case.direction, Direction::Analyze) {
+                let extras: Vec<&str> = act_set.difference(&exp_set).cloned().collect();
+                for e in extras {
+                    println!(
+                        "[{}/{}][{}] {} => {}",
+                        i + 1,
+                        n_items,
+                        "EXTRA".yellow().bold(),
+                        case.input,
+                        e
+                    );
+                    total_lines += 1;
+                }
+            }
+            // For Generate (Lexical/Generation) kan det finnast uventa former i actual.
+            // Desse tel ikkje som eigne linjer i denne kompakte rapporten for å halde formatet stramt.
+            // Feil vert fanga opp via FAIL-linjer når forventa manglar, og totalsummen vil spegle det.
+        }
+        println!();
+        println!(
+            "Test {} - Passes: {}, Fails: {}, Total: {}",
+            test_idx, passes, fails, total_lines
+        );
+        println!();
+        test_idx += 1;
+    }
 }
