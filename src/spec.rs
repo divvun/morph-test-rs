@@ -16,15 +16,15 @@ pub enum BackendChoice {
 #[derive(Debug, Deserialize, Clone)]
 #[serde(rename_all = "PascalCase")]
 pub struct HfstCfg {
-    pub Gen: Option<String>,
-    pub Morph: Option<String>,
+    pub gen: Option<String>,
+    pub morph: Option<String>,
 }
 #[derive(Debug, Deserialize, Clone)]
 #[serde(rename_all = "PascalCase")]
 pub struct XeroxCfg {
-    pub Gen: Option<String>,
-    pub Morph: Option<String>,
-    pub App: Option<String>, // t.d. "lookup"
+    pub gen: Option<String>,
+    pub morph: Option<String>,
+    pub app: Option<String>, // t.d. "lookup"
 }
 #[derive(Debug, Deserialize, Clone)]
 #[serde(rename_all = "PascalCase")]
@@ -41,8 +41,8 @@ pub enum OneOrMany {
 #[derive(Debug, Deserialize, Clone)]
 #[serde(rename_all = "PascalCase")]
 pub struct RawSpec {
-    pub Config: Option<RawConfig>,
-    pub Tests: BTreeMap<String, BTreeMap<String, OneOrMany>>,
+    pub config: Option<RawConfig>,
+    pub tests: BTreeMap<String, BTreeMap<String, OneOrMany>>,
 }
 #[derive(Debug, Clone)]
 pub struct SuiteWithConfig {
@@ -54,9 +54,6 @@ pub struct SuiteWithConfig {
 }
 fn trim_owned(s: &str) -> String {
     s.trim().to_string()
-}
-fn trim_vec(v: Vec<String>) -> Vec<String> {
-    v.into_iter().map(|s| s.trim().to_string()).collect()
 }
 pub fn load_specs(paths: &[PathBuf], prefer: BackendChoice) -> Result<Vec<SuiteWithConfig>> {
     let mut files = Vec::new();
@@ -86,8 +83,8 @@ pub fn load_specs(paths: &[PathBuf], prefer: BackendChoice) -> Result<Vec<SuiteW
         let (backend, lookup_cmd, gen_fst, morph_fst) = resolve_backend(&raw, &prefer)
             .with_context(|| format!("Mangelfull eller utydeleg Config i {}", f.display()))?;
         let mut cases = Vec::new();
-        for (group, map) in &raw.Tests {
-            let group_name = group.trim(); // trim gruppenamn òg
+        for (group, map) in &raw.tests {
+            let group_name = group.trim();
             for (input, expected) in map {
                 let input_trim = input.trim().to_string();
                 let expect_vec = match expected {
@@ -104,7 +101,8 @@ pub fn load_specs(paths: &[PathBuf], prefer: BackendChoice) -> Result<Vec<SuiteW
             }
         }
         let suite = TestSuite {
-            name: f.file_name()
+            name: f
+                .file_name()
                 .map(|s| s.to_string_lossy().into_owned())
                 .unwrap_or_else(|| "suite".to_string()),
             cases,
@@ -119,38 +117,62 @@ pub fn load_specs(paths: &[PathBuf], prefer: BackendChoice) -> Result<Vec<SuiteW
     }
     Ok(out)
 }
-fn resolve_backend(raw: &RawSpec, prefer: &BackendChoice)
-    -> Result<(BackendChoice, String, String, Option<String>)>
-{
-    let cfg = raw.Config.as_ref().ok_or_else(|| anyhow::anyhow!("Config manglar"))?;
+fn resolve_backend(
+    raw: &RawSpec,
+    prefer: &BackendChoice,
+) -> Result<(BackendChoice, String, String, Option<String>)> {
+    let cfg = raw
+        .config
+        .as_ref()
+        .ok_or_else(|| anyhow::anyhow!("Config manglar"))?;
+    // Vel backend: preferert, elles HFST om tilgjengeleg, elles Xerox.
     let chosen = match prefer {
         BackendChoice::Hfst => BackendChoice::Hfst,
         BackendChoice::Xerox => BackendChoice::Xerox,
         BackendChoice::Auto => {
-            if cfg.hfst.as_ref().and_then(|h| h.Gen.clone()).is_some() {
+            if cfg.hfst.as_ref().and_then(|h| h.gen.clone()).is_some() {
                 BackendChoice::Hfst
-            } else if cfg.xerox.as_ref().and_then(|x| x.Gen.clone()).is_some() {
+            } else if cfg.xerox.as_ref().and_then(|x| x.gen.clone()).is_some() {
                 BackendChoice::Xerox
             } else {
-                return Err(anyhow::anyhow!("Fann verken HFST.Gen eller Xerox.Gen i Config"));
+                return Err(anyhow::anyhow!(
+                    "Fann verken HFST.Gen eller Xerox.Gen i Config"
+                ));
             }
         }
     };
     match chosen {
         BackendChoice::Hfst => {
-            let h = cfg.hfst.as_ref().ok_or_else(|| anyhow::anyhow!("Config.hfst manglar"))?;
-            let gen = h.Gen.clone().ok_or_else(|| anyhow::anyhow!("Config.hfst.Gen manglar"))?;
+            let h = cfg
+                .hfst
+                .as_ref()
+                .ok_or_else(|| anyhow::anyhow!("Config.hfst manglar"))?;
+            let gen = h
+                .gen
+                .clone()
+                .ok_or_else(|| anyhow::anyhow!("Config.hfst.Gen manglar"))?;
             let gen = gen.trim().to_string();
-            let morph = h.Morph.clone().map(|m| m.trim().to_string());
+            let morph = h.morph.clone().map(|m| m.trim().to_string());
             let cmd = "hfst-lookup".to_string();
             Ok((BackendChoice::Hfst, cmd, gen, morph))
         }
         BackendChoice::Xerox => {
-            let x = cfg.xerox.as_ref().ok_or_else(|| anyhow::anyhow!("Config.xerox manglar"))?;
-            let gen = x.Gen.clone().ok_or_else(|| anyhow::anyhow!("Config.xerox.Gen manglar"))?;
+            let x = cfg
+                .xerox
+                .as_ref()
+                .ok_or_else(|| anyhow::anyhow!("Config.xerox manglar"))?;
+            let gen = x
+                .gen
+                .clone()
+                .ok_or_else(|| anyhow::anyhow!("Config.xerox.Gen manglar"))?;
             let gen = gen.trim().to_string();
-            let morph = x.Morph.clone().map(|m| m.trim().to_string());
-            let cmd = x.App.clone().unwrap_or_else(|| "lookup".to_string()).trim().to_string();
+            let morph = x.morph.clone().map(|m| m.trim().to_string());
+            let cmd = x
+                .app
+                .clone()
+                .unwrap_or_else(|| "lookup".to_string())
+                .trim()
+                .to_string();
             Ok((BackendChoice::Xerox, cmd, gen, morph))
         }
         BackendChoice::Auto => unreachable!(),
