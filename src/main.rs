@@ -64,14 +64,19 @@ struct Cli {
         help = "Overstyr lookup-kommando (t.d. hfst-optimised-lookup, flookup) [alias: --app]"
     )]
     lookup_tool: Option<String>,
+    // IGNORER ekstra analysar i Analyze-modus
+    #[arg(
+        short = 'i',
+        long = "ignore-extra-analyses",
+        help = "I Analyze-testar: ignorer ekstra analysar (godkjenn dersom alle forventa analysar finst)"
+    )]
+    ignore_extra_analyses: bool,
 }
 fn main() -> Result<()> {
-    // Rayon brukar all CPU-kjernar som standard (maks parallellitet).
     let cli = Cli::parse();
     let suites_with_cfg = load_specs(&cli.tests, cli.backend.into())?;
     let mut aggregate = morph_test::types::Summary::default();
     for swc in suites_with_cfg {
-        // Overstyr generator/analyser frå CLI dersom oppgitt
         let effective_gen = if let Some(gen) = &cli.generator {
             gen.clone()
         } else {
@@ -82,7 +87,6 @@ fn main() -> Result<()> {
         } else {
             swc.morph_fst.clone()
         };
-        // Overstyr lookup-verktøy dersom oppgitt
         let effective_lookup = if let Some(tool) = &cli.lookup_tool {
             tool.trim().to_string()
         } else {
@@ -95,17 +99,15 @@ fn main() -> Result<()> {
             timeout: Some(DEFAULT_TIMEOUT),
             quiet: cli.silent,
         };
-        let summary = run_suites(&backend, &[swc.suite]);
-        // Berre skriv rapport dersom ikkje stille modus
+        let summary = run_suites(&backend, &[swc.suite], cli.ignore_extra_analyses);
         if !cli.silent {
-            print_human(&summary);
+            print_human(&summary, cli.ignore_extra_analyses);
         }
         aggregate.total += summary.total;
         aggregate.passed += summary.passed;
         aggregate.failed += summary.failed;
         aggregate.cases.extend(summary.cases);
     }
-    // Exit-kode: 0 når alt OK, elles ≠ 0
     if aggregate.failed > 0 {
         std::process::exit(1);
     }

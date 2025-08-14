@@ -2,12 +2,21 @@ use crate::backend::Backend;
 use crate::types::{CaseResult, Direction, Summary, TestSuite};
 use rayon::prelude::*;
 use std::collections::BTreeSet;
-fn set_eq_exact(a: &[String], b: &[String]) -> bool {
+fn set_eq(a: &[String], b: &[String]) -> bool {
     let sa: BTreeSet<&str> = a.iter().map(|s| s.as_str()).collect();
     let sb: BTreeSet<&str> = b.iter().map(|s| s.as_str()).collect();
     sa == sb
 }
-pub fn run_suites<B: Backend>(backend: &B, suites: &[TestSuite]) -> Summary {
+fn expected_subset_of_actual(actual: &[String], expected: &[String]) -> bool {
+    let sa: BTreeSet<&str> = actual.iter().map(|s| s.as_str()).collect();
+    let sb: BTreeSet<&str> = expected.iter().map(|s| s.as_str()).collect();
+    sb.is_subset(&sa)
+}
+pub fn run_suites<B: Backend>(
+    backend: &B,
+    suites: &[TestSuite],
+    ignore_extra_analyses: bool,
+) -> Summary {
     let mut all_cases = Vec::new();
     for s in suites {
         for c in &s.cases {
@@ -23,7 +32,12 @@ pub fn run_suites<B: Backend>(backend: &B, suites: &[TestSuite]) -> Summary {
             };
             match res {
                 Ok(actual) => {
-                    let passed = set_eq_exact(&actual, &case.expect);
+                    let passed = match case.direction {
+                        Direction::Analyze if ignore_extra_analyses => {
+                            expected_subset_of_actual(&actual, &case.expect)
+                        }
+                        _ => set_eq(&actual, &case.expect),
+                    };
                     CaseResult {
                         name: case.name.clone(),
                         direction: case.direction.clone(),

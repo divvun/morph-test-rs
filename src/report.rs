@@ -1,7 +1,7 @@
-use crate::types::Summary;
+use crate::types::{Direction, Summary};
 use colored::Colorize;
 use std::collections::BTreeSet;
-pub fn render_human(summary: &Summary) -> String {
+pub fn render_human(summary: &Summary, ignore_extra_analyses: bool) -> String {
     let mut out = String::new();
     let header = format!(
         "Total: {}, Passed: {}, Failed: {}",
@@ -30,7 +30,7 @@ pub fn render_human(summary: &Summary) -> String {
             } else {
                 out.push_str(&format!("  {} {:?}\n", "expected:".bold(), c.expected));
                 out.push_str(&format!("  {} {:?}\n", "actual  :".bold(), c.actual));
-                // Diff for set-likskap
+                // Diff
                 let exp: BTreeSet<&str> = c.expected.iter().map(|s| s.as_str()).collect();
                 let act: BTreeSet<&str> = c.actual.iter().map(|s| s.as_str()).collect();
                 let missing: Vec<&str> = exp.difference(&act).cloned().collect();
@@ -38,14 +38,19 @@ pub fn render_human(summary: &Summary) -> String {
                 if !missing.is_empty() {
                     out.push_str(&format!("  {} {:?}\n", "missing :".bold(), missing));
                 }
+                // Merk “extra (ignored)” berre for Analyze når flagget er sett
                 if !extra.is_empty() {
-                    out.push_str(&format!("  {} {:?}\n", "unexpected:".bold(), extra));
+                    if matches!(c.direction, Direction::Analyze) && ignore_extra_analyses {
+                        out.push_str(&format!("  {} {:?}\n", "extra (ignored):".bold(), extra));
+                    } else {
+                        out.push_str(&format!("  {} {:?}\n", "unexpected:".bold(), extra));
+                    }
                 }
             }
         }
     }
     out
 }
-pub fn print_human(summary: &Summary) {
-    print!("{}", render_human(summary));
+pub fn print_human(summary: &Summary, ignore_extra_analyses: bool) {
+    print!("{}", render_human(summary, ignore_extra_analyses));
 }
