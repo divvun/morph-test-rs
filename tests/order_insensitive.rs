@@ -3,7 +3,9 @@ use anyhow::Result;
 use morph_test::backend::Backend;
 use morph_test::engine::run_suites;
 use morph_test::types::*;
+
 struct MockBackend;
+
 impl Backend for MockBackend {
     fn analyze(&self, _input: &str) -> Result<Vec<String>> {
         Ok(vec![])
@@ -12,6 +14,7 @@ impl Backend for MockBackend {
         Ok(vec!["a".into(), "b".into(), "c".into()])
     }
 }
+
 #[test]
 fn order_does_not_matter_for_lists() {
     let suite = TestSuite {
@@ -24,7 +27,7 @@ fn order_does_not_matter_for_lists() {
         }],
     };
     let backend = MockBackend;
-    let summary = run_suites(&backend, &[suite]);
+    let summary = run_suites(&backend, &[suite], true);
     assert_eq!(summary.total, 1);
     assert_eq!(summary.failed, 0);
 }

@@ -23,6 +23,9 @@ colored = "3"
 wait-timeout = "0.2"
 which = "8.0"
 
+[dev-dependencies]
+tempfile = "3.20"
+
 [package.metadata.binstall]
 pkg-url = "{ repo }/releases/download/v{ version }/{ name }-{ target }-v{ version }{ archive-suffix }"
 bin-dir = "{ name }-{ target }-v{ version }/{ bin }{ binary-ext }"

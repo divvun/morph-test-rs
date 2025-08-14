@@ -4,7 +4,9 @@ use morph_test::engine::run_suites;
 use morph_test::spec::{BackendChoice, load_specs};
 use std::fs;
 use tempfile::tempdir;
+
 struct MockGen;
+
 impl Backend for MockGen {
     fn analyze(&self, _input: &str) -> Result<Vec<String>> {
         Ok(vec![])
@@ -18,6 +20,7 @@ impl Backend for MockGen {
         })
     }
 }
+
 #[test]
 fn trims_spaces_in_yaml_keys_and_values() -> Result<()> {
     let dir = tempdir()?;
@@ -47,7 +50,7 @@ Tests:
     assert_eq!(c2.expect, vec!["bar", "baz"]);
     // Kjør testen med mock-backend
     let backend = MockGen;
-    let summary = run_suites(&backend, &[suite.clone()]);
+    let summary = run_suites(&backend, &[suite.clone()], true);
     assert_eq!(summary.failed, 0);
     Ok(())
 }
