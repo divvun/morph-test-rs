@@ -5,6 +5,8 @@ use morph_test::engine::run_suites;
 use morph_test::report::print_human;
 use morph_test::spec::{load_specs, BackendChoice};
 use std::path::{Path, PathBuf};
+// legg til denne:
+use colored::control::set_override as set_color_override;
 #[derive(Copy, Clone, Debug, Eq, PartialEq, ValueEnum)]
 enum BackendOpt {
     Auto,
@@ -25,7 +27,6 @@ impl From<BackendOpt> for BackendChoice {
 struct Cli {
     #[arg(value_name = "TEST_PATHS", required = true)]
     tests: Vec<PathBuf>,
-    // Standard: HFST med hfst-optimised-lookup
     #[arg(
         long,
         value_enum,
@@ -33,7 +34,6 @@ struct Cli {
         help = "Vel backend (hfst eller foma)"
     )]
     backend: BackendOpt,
-    // --generator og synonymet --gen
     #[arg(
         long,
         value_name = "FILE",
@@ -41,7 +41,6 @@ struct Cli {
         help = "Overstyr generator-FST (.hfstol for HFST, .foma for Foma) [alias: --gen]"
     )]
     generator: Option<String>,
-    // --analyser og synonyma --morph og --analyzer
     #[arg(
         long,
         value_name = "FILE",
@@ -49,14 +48,12 @@ struct Cli {
         help = "Overstyr analyser-FST (.hfstol for HFST, .foma for Foma) [alias: --morph, --analyzer]"
     )]
     analyser: Option<String>,
-    // Stille-modus
     #[arg(
         short = 'q',
         long = "silent",
         help = "Stille modus: ingen utskrift, og demp stderr frå lookup"
     )]
     silent: bool,
-    // Overstyr lookup-kommandoen (alias --app for YAML-kompat)
     #[arg(
         long = "lookup-tool",
         value_name = "CMD",
@@ -64,14 +61,24 @@ struct Cli {
         help = "Overstyr lookup-kommando (t.d. hfst-optimised-lookup, flookup) [alias: --app]"
     )]
     lookup_tool: Option<String>,
-    // Ignorer ekstra analysar i Analyze-modus
     #[arg(
         short = 'i',
         long = "ignore-extra-analyses",
         help = "I Analyze-testar: ignorer ekstra analysar (godkjenn dersom alle forventa analysar finst)"
     )]
     ignore_extra_analyses: bool,
-    // Verbose-modus: metadata og framdriftsmeldingar
+    // NYTT: fargekontroll
+    #[arg(
+        short = 'c',
+        long = "color",
+        help = "Tving fargar på (standard er fargar på)"
+    )]
+    color: bool,
+    #[arg(
+        long = "no-color",
+        help = "Slå av fargar i rapporten (overstyrer --color)"
+    )]
+    no_color: bool,
     #[arg(
         short = 'v',
         long = "verbose",
@@ -86,22 +93,25 @@ fn display_path(path: &str) -> String {
     }
 }
 fn resolve_lookup_path(cmd: &str) -> String {
-    // Dersom cmd allereie er ein sti (inneheld skråstrek), prøv å canonicalize.
     if cmd.contains(std::path::MAIN_SEPARATOR) || cmd.starts_with("./") || cmd.starts_with(".\\") {
         return display_path(cmd);
     }
-    // Elles, prøv å slå opp i PATH
     match which::which(cmd) {
         Ok(p) => p.to_string_lossy().into_owned(),
-        Err(_) => cmd.to_string(), // fallback til oppgitt streng
+        Err(_) => cmd.to_string(),
     }
 }
 fn main() -> Result<()> {
-    // Rayon brukar all CPU-kjernar som standard (maks parallellitet).
     let cli = Cli::parse();
+    // Sett fargepolicy tidleg. --no-color vinn over --color. Standard: fargar på.
+    if cli.no_color {
+        set_color_override(false);
+    } else {
+        // anten eksplisitt --color eller standard
+        set_color_override(true);
+    }
     let suites_with_cfg = load_specs(&cli.tests, cli.backend.into())?;
     let mut aggregate = morph_test::types::Summary::default();
-    // Print global metadata (versjon) ved verbose, om ikkje i silent-modus
     if cli.verbose && !cli.silent {
         println!(
             "[INFO] {} v{}",
@@ -110,7 +120,6 @@ fn main() -> Result<()> {
         );
     }
     for swc in suites_with_cfg {
-        // Overstyr generator/analyser frå CLI dersom oppgitt
         let effective_gen = if let Some(gen) = &cli.generator {
             gen.clone()
         } else {
@@ -121,13 +130,11 @@ fn main() -> Result<()> {
         } else {
             swc.morph_fst.clone()
         };
-        // Overstyr lookup-verktøy dersom oppgitt
         let effective_lookup = if let Some(tool) = &cli.lookup_tool {
             tool.trim().to_string()
         } else {
             swc.lookup_cmd.clone()
         };
-        // Lag fulle stiar for utskrift
         let lookup_full = resolve_lookup_path(&effective_lookup);
         let gen_full = display_path(&effective_gen);
         let morph_full = effective_morph
@@ -158,7 +165,6 @@ fn main() -> Result<()> {
                 summary.passed, summary.failed
             );
         }
-        // Berre skriv rapport dersom ikkje stille modus
         if !cli.silent {
             print_human(&summary, cli.ignore_extra_analyses);
         }
@@ -173,7 +179,6 @@ fn main() -> Result<()> {
             aggregate.total, aggregate.passed, aggregate.failed
         );
     }
-    // Exit-kode: 0 når alt OK, elles ≠ 0
     if aggregate.failed > 0 {
         std::process::exit(1);
     }
