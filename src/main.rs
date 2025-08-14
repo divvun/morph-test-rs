@@ -3,7 +3,7 @@ use clap::{Parser, ValueEnum};
 use colored::control::set_override as set_color_override;
 use morph_test::backend::{ExternalBackend, DEFAULT_TIMEOUT};
 use morph_test::engine::run_suites;
-use morph_test::report::print_human;
+use morph_test::report::{print_human, OutputKind};
 use morph_test::spec::{load_specs, BackendChoice};
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
@@ -22,6 +22,23 @@ impl From<BackendOpt> for BackendChoice {
         }
     }
 }
+#[derive(Copy, Clone, Debug, Eq, PartialEq, ValueEnum)]
+enum OutputFormat {
+    Compact,
+    Terse,
+    Final,
+    Normal,
+}
+impl From<OutputFormat> for OutputKind {
+    fn from(v: OutputFormat) -> Self {
+        match v {
+            OutputFormat::Normal => OutputKind::Normal,
+            OutputFormat::Compact => OutputKind::Compact,
+            OutputFormat::Terse => OutputKind::Terse,
+            OutputFormat::Final => OutputKind::Final,
+        }
+    }
+}
 #[derive(Parser, Debug)]
 #[command(
     version,
@@ -29,6 +46,7 @@ impl From<BackendOpt> for BackendChoice {
     about = "Morphological test runner (surface/analyze and lexical/generate)"
 )]
 struct Cli {
+    // TEST_PATHS: ei eller fleire YAML-filer/mapper med testdata
     #[arg(value_name = "TEST_PATHS", required = true)]
     tests: Vec<PathBuf>,
     // Backend-val: standard HFST. Alias for bakoverkompatibilitet: -S / --section
@@ -41,6 +59,7 @@ struct Cli {
         help = "Vel backend/section (hfst eller foma) [alias: -S/--section]"
     )]
     backend: BackendOpt,
+    // Overstyr generator-FST
     #[arg(
         long,
         value_name = "FILE",
@@ -48,14 +67,22 @@ struct Cli {
         help = "Overstyr generator-FST (.hfstol for HFST, .foma for Foma) [alias: --gen]"
     )]
     generator: Option<String>,
-    #[arg(long, value_name = "FILE", visible_aliases = ["morph", "analyzer"], help = "Overstyr analyser-FST (.hfstol for HFST, .foma for Foma) [alias: --morph, --analyzer]")]
+    // Overstyr analyser-FST
+    #[arg(
+        long,
+        value_name = "FILE",
+        visible_aliases = ["morph", "analyzer"],
+        help = "Overstyr analyser-FST (.hfstol for HFST, .foma for Foma) [alias: --morph, --analyzer]"
+    )]
     analyser: Option<String>,
+    // Stille-modus
     #[arg(
         short = 'q',
         long = "silent",
         help = "Stille modus: ingen utskrift, og demp stderr frå lookup"
     )]
     silent: bool,
+    // Overstyr lookup-kommandoen
     #[arg(
         long = "lookup-tool",
         value_name = "CMD",
@@ -63,12 +90,14 @@ struct Cli {
         help = "Overstyr lookup-kommando (t.d. hfst-optimised-lookup, flookup) [alias: --app]"
     )]
     lookup_tool: Option<String>,
+    // Ignorer ekstra analysar i Analyze-modus
     #[arg(
         short = 'i',
         long = "ignore-extra-analyses",
         help = "Analyze-testar: godkjenn når alle forventa analysar finst, sjølv om det finst ekstra analysar"
     )]
     ignore_extra_analyses: bool,
+    // Fargekontroll
     #[arg(
         short = 'c',
         long = "color",
@@ -80,12 +109,14 @@ struct Cli {
         help = "Slå av fargar i rapporten (overstyrer --color)"
     )]
     no_color: bool,
+    // Verbose
     #[arg(
         short = 'v',
         long = "verbose",
         help = "Vis metadata (lookup med full sti, generator/analyzer med fulle stiar, versjon) og framdriftsmeldingar. Viser òg ‘EXTRA’ for Analyze-PASS når -i er aktiv."
     )]
     verbose: bool,
+    // Filtrer retning
     #[arg(
         short = 's',
         long = "surface",
@@ -100,6 +131,7 @@ struct Cli {
         help = "Køyr berre genereringstestar (lexical tags → surface forms)"
     )]
     lexical: bool,
+    // Filtrering av rapportlinjer
     #[arg(
         short = 'f',
         long = "hide-fails",
@@ -123,6 +155,15 @@ struct Cli {
         help = "Køyr berre angitt test: nummer 1..N, tittel „Gruppe (Lexical/Generation|Surface/Analysis)” eller berre gruppenamnet frå YAML. Spesial: 0, ‘null’ eller ‘liste’ listar alle tilgjengelege testar og avsluttar."
     )]
     test: Option<String>,
+    // NYTT: rapportformat
+    #[arg(
+        short = 'o',
+        long = "output",
+        value_enum,
+        default_value = "normal",
+        help = "Rapportformat: compact | terse | final | normal (standard: normal)"
+    )]
+    output: OutputFormat,
 }
 fn display_path(path: &str) -> String {
     match std::fs::canonicalize(Path::new(path)) {
@@ -159,9 +200,9 @@ fn main() -> Result<()> {
     } else {
         set_color_override(true);
     }
-    // Last og evt. backend-preferanse
+    // Last suites frå teststiar
     let mut suites = load_specs(&cli.tests, cli.backend.into())?;
-    // Filtrér retning på førehand (slik at både rapport og -t/--test bruker same blokkliste)
+    // Filtrér retning før vi bygger blokker
     for swc in &mut suites {
         if cli.surface {
             swc.suite
@@ -173,9 +214,8 @@ fn main() -> Result<()> {
                 .retain(|c| matches!(c.direction, morph_test::types::Direction::Generate));
         }
     }
-    // Kast suites utan relevante cases
     suites.retain(|swc| !swc.suite.cases.is_empty());
-    // Bygg blokkliste (1-basert nummerering) etter encounter-order på tvers av alle suites
+    // Bygg blokkliste (1-basert) i encounter-ordning over alle suites
     #[derive(Clone)]
     struct BlockRef {
         suite_idx: usize,
@@ -197,14 +237,13 @@ fn main() -> Result<()> {
             }
         }
     }
-    // Om -t/--test er spesifisert: spesialtilfelle eller val av blokk(er)
+    // -t/--test: spesial 0/null/liste => list opp og avslutt
     if let Some(sel) = &cli.test {
         if blocks.is_empty() {
             eprintln!("Ingen testar tilgjengeleg etter filtrering.");
             std::process::exit(2);
         }
         let trimmed = sel.trim();
-        // Spesial: 0 / null / liste => list opp og exit(0)
         if trimmed == "0"
             || trimmed.eq_ignore_ascii_case("null")
             || trimmed.eq_ignore_ascii_case("liste")
@@ -215,8 +254,8 @@ fn main() -> Result<()> {
             }
             return Ok(());
         }
+        // Vel ut blokk(er) etter input: nummer, full tittel eller gruppenamn
         let mut selected: Vec<BlockRef> = Vec::new();
-        // 1) Tal (1-basert)
         if let Ok(n) = trimmed.parse::<usize>() {
             if n == 0 || n > blocks.len() {
                 eprintln!(
@@ -232,14 +271,12 @@ fn main() -> Result<()> {
             }
             selected.push(blocks[n - 1].clone());
         } else {
-            // 2) Eksakt tittel "Gruppe (Lexical/Generation|Surface/Analysis)"
             for b in &blocks {
                 let title = format!("{} ({})", b.group, mode_label(&b.dir));
                 if title == trimmed {
                     selected.push(b.clone());
                 }
             }
-            // 3) Berre gruppenamn (ID frå YAML): vel alle blokker som matchar denne gruppa
             if selected.is_empty() {
                 for b in &blocks {
                     if b.group == trimmed {
@@ -256,9 +293,8 @@ fn main() -> Result<()> {
                 std::process::exit(2);
             }
         }
-        // Filtrer suites til berre dei valde blokkene
+        // Filtrer suites til berre valde blokker
         for (si, swc) in suites.iter_mut().enumerate() {
-            // Samle alle (group, dir) for denne suite_idx
             let allowed: Vec<(String, morph_test::types::Direction)> = selected
                 .iter()
                 .filter(|b| b.suite_idx == si)
@@ -343,6 +379,7 @@ fn main() -> Result<()> {
                 cli.verbose,
                 cli.hide_fails,
                 cli.hide_passes,
+                cli.output.into(),
             );
         }
         aggregate.total += summary.total;

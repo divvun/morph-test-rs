@@ -1,6 +1,13 @@
 use crate::types::{CaseResult, Direction, Summary};
 use colored::Colorize;
 use std::collections::{BTreeMap, BTreeSet};
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum OutputKind {
+    Normal,
+    Compact,
+    Terse,
+    Final,
+}
 fn parse_group(name: &str) -> (&str, &str) {
     match name.split_once(": ") {
         Some((g, rest)) => (g, rest),
@@ -16,7 +23,8 @@ fn mode_label(dir: &Direction) -> &'static str {
 fn dash_line(width: usize) -> String {
     "-".repeat(width)
 }
-pub fn print_human(
+// Intern: normal-formatet (dagens format)
+fn print_human_normal(
     summary: &Summary,
     ignore_extra_analyses: bool,
     verbose: bool,
@@ -162,5 +170,36 @@ pub fn print_human(
         );
         println!();
         test_idx += 1;
+    }
+}
+// Offentleg API: ruter til riktig format (normal no; andre fell tilbake til normal inntil vi implementerer dei)
+pub fn print_human(
+    summary: &Summary,
+    ignore_extra_analyses: bool,
+    verbose: bool,
+    hide_fails: bool,
+    hide_passes: bool,
+    output: OutputKind,
+) {
+    match output {
+        OutputKind::Normal => {
+            print_human_normal(
+                summary,
+                ignore_extra_analyses,
+                verbose,
+                hide_fails,
+                hide_passes,
+            );
+        }
+        OutputKind::Compact | OutputKind::Terse | OutputKind::Final => {
+            // Førebels: bruk normal som fallback inntil vi implementerer eiga utskrift
+            print_human_normal(
+                summary,
+                ignore_extra_analyses,
+                verbose,
+                hide_fails,
+                hide_passes,
+            );
+        }
     }
 }
