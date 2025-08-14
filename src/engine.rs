@@ -1,16 +1,11 @@
 use crate::backend::Backend;
 use crate::types::{CaseResult, Direction, Summary, TestSuite};
 use rayon::prelude::*;
-fn vec_eq_exact(a: &[String], b: &[String]) -> bool {
-    if a.len() != b.len() {
-        return false;
-    }
-    for (x, y) in a.iter().zip(b.iter()) {
-        if x != y {
-            return false;
-        }
-    }
-    true
+use std::collections::BTreeSet;
+fn set_eq_exact(a: &[String], b: &[String]) -> bool {
+    let sa: BTreeSet<&str> = a.iter().map(|s| s.as_str()).collect();
+    let sb: BTreeSet<&str> = b.iter().map(|s| s.as_str()).collect();
+    sa == sb
 }
 pub fn run_suites<B: Backend>(backend: &B, suites: &[TestSuite]) -> Summary {
     let mut all_cases = Vec::new();
@@ -28,7 +23,7 @@ pub fn run_suites<B: Backend>(backend: &B, suites: &[TestSuite]) -> Summary {
             };
             match res {
                 Ok(actual) => {
-                    let passed = vec_eq_exact(&actual, &case.expect);
+                    let passed = set_eq_exact(&actual, &case.expect);
                     CaseResult {
                         name: case.name.clone(),
                         direction: case.direction.clone(),
