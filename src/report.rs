@@ -23,15 +23,13 @@ fn mode_label(dir: &Direction) -> &'static str {
 fn dash_line(width: usize) -> String {
     "-".repeat(width)
 }
-// Intern: normal-formatet (dagens format)
-fn print_human_normal(
-    summary: &Summary,
-    ignore_extra_analyses: bool,
-    verbose: bool,
-    hide_fails: bool,
-    hide_passes: bool,
+// Bygg blokker (gruppering per (gruppe, retning)) i encounter-ordning
+fn build_blocks<'a>(
+    cases: &'a [CaseResult],
+) -> (
+    Vec<(String, Direction)>,
+    BTreeMap<(String, Direction), Vec<&'a CaseResult>>,
 ) {
-    // Gruppér etter (group, direction) i rekkjefølgje vi møter dei
     #[derive(PartialEq, Eq, PartialOrd, Ord)]
     struct Key {
         group: String,
@@ -39,7 +37,7 @@ fn print_human_normal(
     }
     let mut order: Vec<Key> = Vec::new();
     let mut groups: BTreeMap<(String, Direction), Vec<&CaseResult>> = BTreeMap::new();
-    for c in &summary.cases {
+    for c in cases {
         let (group, _) = parse_group(&c.name);
         let key = (group.to_string(), c.direction.clone());
         if !groups.contains_key(&key) {
@@ -51,10 +49,22 @@ fn print_human_normal(
         }
         groups.get_mut(&key).unwrap().push(c);
     }
+    let seq: Vec<(String, Direction)> = order.into_iter().map(|k| (k.group, k.dir)).collect();
+    (seq, groups)
+}
+// Intern: normal-formatet (dagens format)
+fn print_human_normal(
+    summary: &Summary,
+    ignore_extra_analyses: bool,
+    verbose: bool,
+    hide_fails: bool,
+    hide_passes: bool,
+) {
+    let (seq, groups) = build_blocks(&summary.cases);
     // For kvar blokk (gruppe+retning)
     let mut test_idx = 1usize; // 1-basert nummerering
-    for key in order {
-        let cases = match groups.get(&(key.group.clone(), key.dir.clone())) {
+    for key in seq {
+        let cases = match groups.get(&key) {
             Some(v) => v,
             None => continue,
         };
@@ -62,12 +72,7 @@ fn print_human_normal(
             continue;
         }
         // Tittel-linje
-        let title = format!(
-            "Test {}: {} ({})",
-            test_idx,
-            key.group,
-            mode_label(&key.dir)
-        );
+        let title = format!("Test {}: {} ({})", test_idx, key.0, mode_label(&key.1));
         let line = dash_line(title.len());
         println!("{}", line);
         println!("{}", title);
@@ -172,7 +177,154 @@ fn print_human_normal(
         test_idx += 1;
     }
 }
-// Offentleg API: ruter til riktig format (normal no; andre fell tilbake til normal inntil vi implementerer dei)
+// Nytt: compact-format
+fn print_human_compact(summary: &Summary, ignore_extra_analyses: bool) {
+    let (seq, groups) = build_blocks(&summary.cases);
+    let mut total_passes = 0usize;
+    let mut total_fails = 0usize;
+    let mut total_checks = 0usize;
+    let mut test_idx = 1usize; // 1-basert
+    for key in seq {
+        let cases = match groups.get(&key) {
+            Some(v) => v,
+            None => continue,
+        };
+        if cases.is_empty() {
+            continue;
+        }
+        let mut passes = 0usize;
+        let mut fails = 0usize;
+        let mut checks = 0usize;
+        for case in cases {
+            let act_set: BTreeSet<&str> = case.actual.iter().map(|s| s.as_str()).collect();
+            if case.expected.is_empty() {
+                let is_pass = match case.direction {
+                    Direction::Analyze if ignore_extra_analyses => true,
+                    _ => case.actual.is_empty(),
+                };
+                checks += 1;
+                if is_pass {
+                    passes += 1;
+                } else {
+                    fails += 1;
+                }
+                continue;
+            }
+            for exp in &case.expected {
+                let ok = act_set.contains(exp.as_str());
+                checks += 1;
+                if ok {
+                    passes += 1;
+                } else {
+                    fails += 1;
+                }
+            }
+        }
+        let status = if fails == 0 {
+            "[PASS]".green().bold().to_string()
+        } else {
+            "[FAIL]".red().bold().to_string()
+        };
+        println!(
+            "{} Test {}: {} ({}) {}/{}/{}",
+            status,
+            test_idx,
+            key.0,
+            mode_label(&key.1),
+            passes,
+            fails,
+            checks
+        );
+        total_passes += passes;
+        total_fails += fails;
+        total_checks += checks;
+        test_idx += 1;
+    }
+    println!(
+        "Total passes: {}, Total fails: {}, Total: {}",
+        total_passes, total_fails, total_checks
+    );
+}
+// Nytt: terse-format (prikker/utrop for kvar sjekk, éi line per testblokk, og PASS/FAIL til slutt)
+fn print_human_terse(summary: &Summary, ignore_extra_analyses: bool) {
+    let (seq, groups) = build_blocks(&summary.cases);
+    let mut any_fail = false;
+    for key in seq {
+        let cases = match groups.get(&key) {
+            Some(v) => v,
+            None => continue,
+        };
+        if cases.is_empty() {
+            println!();
+            continue;
+        }
+        let mut line = String::new();
+        for case in cases {
+            let act_set: BTreeSet<&str> = case.actual.iter().map(|s| s.as_str()).collect();
+            if case.expected.is_empty() {
+                let is_pass = match case.direction {
+                    Direction::Analyze if ignore_extra_analyses => true,
+                    _ => case.actual.is_empty(),
+                };
+                line.push(if is_pass { '.' } else { '!' });
+                if !is_pass {
+                    any_fail = true;
+                }
+                continue;
+            }
+            for exp in &case.expected {
+                let ok = act_set.contains(exp.as_str());
+                line.push(if ok { '.' } else { '!' });
+                if !ok {
+                    any_fail = true;
+                }
+            }
+        }
+        println!("{}", line);
+    }
+    println!("{}", if any_fail { "FAIL" } else { "PASS" });
+}
+// Nytt: final-format (berre totalsamandrag P/F/T)
+fn print_human_final(summary: &Summary, ignore_extra_analyses: bool) {
+    // Summér globalt
+    let (seq, groups) = build_blocks(&summary.cases);
+    let mut total_passes = 0usize;
+    let mut total_fails = 0usize;
+    let mut total_checks = 0usize;
+    for key in seq {
+        let cases = match groups.get(&key) {
+            Some(v) => v,
+            None => continue,
+        };
+        for case in cases {
+            let act_set: BTreeSet<&str> = case.actual.iter().map(|s| s.as_str()).collect();
+            if case.expected.is_empty() {
+                let is_pass = match case.direction {
+                    Direction::Analyze if ignore_extra_analyses => true,
+                    _ => case.actual.is_empty(),
+                };
+                total_checks += 1;
+                if is_pass {
+                    total_passes += 1;
+                } else {
+                    total_fails += 1;
+                }
+                continue;
+            }
+            for exp in &case.expected {
+                let ok = act_set.contains(exp.as_str());
+                total_checks += 1;
+                if ok {
+                    total_passes += 1;
+                } else {
+                    total_fails += 1;
+                }
+            }
+        }
+    }
+    println!("{}/{}/{}", total_passes, total_fails, total_checks);
+}
+// Offentleg API: ruter til riktig format
 pub fn print_human(
     summary: &Summary,
     ignore_extra_analyses: bool,
@@ -191,15 +343,17 @@ pub fn print_human(
                 hide_passes,
             );
         }
-        OutputKind::Compact | OutputKind::Terse | OutputKind::Final => {
-            // Førebels: bruk normal som fallback inntil vi implementerer eiga utskrift
-            print_human_normal(
-                summary,
-                ignore_extra_analyses,
-                verbose,
-                hide_fails,
-                hide_passes,
-            );
+        OutputKind::Compact => {
+            // compact bryr seg ikkje om verbose/hide-flagg; skriv testlinjer + totalsamandrag
+            print_human_compact(summary, ignore_extra_analyses);
+        }
+        OutputKind::Terse => {
+            // terse: prikker/utrop per sjekk, PASS/FAIL til slutt
+            print_human_terse(summary, ignore_extra_analyses);
+        }
+        OutputKind::Final => {
+            // final: berre totalsamandrag P/F/T
+            print_human_final(summary, ignore_extra_analyses);
         }
     }
 }
