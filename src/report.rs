@@ -44,7 +44,7 @@ pub fn print_human(
         groups.get_mut(&key).unwrap().push(c);
     }
     // For kvar blokk (gruppe+retning)
-    let mut test_idx = 0usize;
+    let mut test_idx = 1usize; // 1-basert nummerering
     for key in order {
         let cases = match groups.get(&(key.group.clone(), key.dir.clone())) {
             Some(v) => v,
@@ -105,7 +105,6 @@ pub fn print_human(
                 {
                     let extras: Vec<&str> = act_set.difference(&exp_set).cloned().collect();
                     if !extras.is_empty() && !hide_passes {
-                        // knytt til PASS/placeholder her
                         for e in extras {
                             println!(
                                 "[{}/{}][{}] {} => {}",

@@ -5,6 +5,7 @@ use morph_test::backend::{ExternalBackend, DEFAULT_TIMEOUT};
 use morph_test::engine::run_suites;
 use morph_test::report::print_human;
 use morph_test::spec::{load_specs, BackendChoice};
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 #[derive(Copy, Clone, Debug, Eq, PartialEq, ValueEnum)]
 enum BackendOpt {
@@ -96,7 +97,6 @@ struct Cli {
         help = "Køyr berre genereringstestar (lexical tags → surface forms)"
     )]
     lexical: bool,
-    // NYTT: filtrering av rapportlinjer
     #[arg(
         short = 'f',
         long = "hide-fails",
@@ -111,6 +111,14 @@ struct Cli {
         help = "Skjul gjennomgåtte (PASS), vis berre feil (FAIL)"
     )]
     hide_passes: bool,
+    // NYTT: køyre berre éin testblokk (1-basert nummer eller tittel "Gruppe (Lexical/Generation|Surface/Analysis)")
+    #[arg(
+        short = 't',
+        long = "test",
+        value_name = "TEST",
+        help = "Køyr berre angitt test (nummer 1..N, eller tittel „Gruppe (Lexical/Generation|Surface/Analysis)”)"
+    )]
+    test: Option<String>,
 }
 fn display_path(path: &str) -> String {
     match std::fs::canonicalize(Path::new(path)) {
@@ -127,6 +135,18 @@ fn resolve_lookup_path(cmd: &str) -> String {
         Err(_) => cmd.to_string(),
     }
 }
+fn mode_label(dir: &morph_test::types::Direction) -> &'static str {
+    match dir {
+        morph_test::types::Direction::Generate => "Lexical/Generation",
+        morph_test::types::Direction::Analyze => "Surface/Analysis",
+    }
+}
+fn group_of_case_name(name: &str) -> &str {
+    match name.split_once(": ") {
+        Some((g, _)) => g,
+        None => name,
+    }
+}
 fn main() -> Result<()> {
     let cli = Cli::parse();
     // Fargar: standard på, --no-color slår av
@@ -135,17 +155,10 @@ fn main() -> Result<()> {
     } else {
         set_color_override(true);
     }
-    let suites_with_cfg = load_specs(&cli.tests, cli.backend.into())?;
-    let mut aggregate = morph_test::types::Summary::default();
-    if cli.verbose && !cli.silent {
-        println!(
-            "[INFO] {} v{}",
-            env!("CARGO_PKG_NAME"),
-            env!("CARGO_PKG_VERSION")
-        );
-    }
-    for mut swc in suites_with_cfg {
-        // Filtrér cases etter ønskja retning
+    // Last og evt. backend-preferanse
+    let mut suites = load_specs(&cli.tests, cli.backend.into())?;
+    // Filtrér retning på førehand (slik at både rapport og -t/--test bruker same blokkliste)
+    for swc in &mut suites {
         if cli.surface {
             swc.suite
                 .cases
@@ -155,9 +168,89 @@ fn main() -> Result<()> {
                 .cases
                 .retain(|c| matches!(c.direction, morph_test::types::Direction::Generate));
         }
-        if swc.suite.cases.is_empty() {
-            continue;
+    }
+    // Kast suites utan relevante cases
+    suites.retain(|swc| !swc.suite.cases.is_empty());
+    // Bygg blokkliste (1-basert nummerering) etter encounter-order på tvers av alle suites
+    #[derive(Clone)]
+    struct BlockRef {
+        suite_idx: usize,
+        group: String,
+        dir: morph_test::types::Direction,
+    }
+    let mut blocks: Vec<BlockRef> = Vec::new();
+    for (si, swc) in suites.iter().enumerate() {
+        let mut seen: HashSet<(String, morph_test::types::Direction)> = HashSet::new();
+        for c in &swc.suite.cases {
+            let g = group_of_case_name(&c.name).to_string();
+            let key = (g.clone(), c.direction.clone());
+            if seen.insert(key.clone()) {
+                blocks.push(BlockRef {
+                    suite_idx: si,
+                    group: g,
+                    dir: c.direction.clone(),
+                });
+            }
         }
+    }
+    // Om -t/--test er spesifisert: vel ut berre denne blokka
+    if let Some(sel) = &cli.test {
+        if blocks.is_empty() {
+            eprintln!("Ingen testar tilgjengeleg etter filtrering.");
+            std::process::exit(2);
+        }
+        let mut selected: Option<BlockRef> = None;
+        if let Ok(n) = sel.parse::<usize>() {
+            if n == 0 || n > blocks.len() {
+                eprintln!(
+                    "Ugyldig testnummer {}. Gyldig område: 1..{}.",
+                    n,
+                    blocks.len()
+                );
+                std::process::exit(2);
+            }
+            selected = Some(blocks[n - 1].clone());
+        } else {
+            // Forvent full tittel "Gruppe (Lexical/Generation|Surface/Analysis)"
+            for b in &blocks {
+                let title = format!("{} ({})", b.group, mode_label(&b.dir));
+                if title == *sel {
+                    selected = Some(b.clone());
+                    break;
+                }
+            }
+            if selected.is_none() {
+                eprintln!("Fann ikkje test med tittel: {}", sel);
+                eprintln!("Tilgjengelege testar:");
+                for (idx, b) in blocks.iter().enumerate() {
+                    eprintln!("  {}: {} ({})", idx + 1, b.group, mode_label(&b.dir));
+                }
+                std::process::exit(2);
+            }
+        }
+        // Behald berre den valde blokka
+        let chosen = selected.unwrap();
+        for (si, swc) in suites.iter_mut().enumerate() {
+            if si != chosen.suite_idx {
+                swc.suite.cases.clear();
+                continue;
+            }
+            swc.suite.cases.retain(|c| {
+                group_of_case_name(&c.name) == chosen.group && c.direction == chosen.dir
+            });
+        }
+        suites.retain(|swc| !swc.suite.cases.is_empty());
+    }
+    let mut aggregate = morph_test::types::Summary::default();
+    if cli.verbose && !cli.silent {
+        println!(
+            "[INFO] {} v{}",
+            env!("CARGO_PKG_NAME"),
+            env!("CARGO_PKG_VERSION")
+        );
+    }
+    // Køyr per suite
+    for swc in suites {
         // Overstyr frå CLI
         let effective_gen = cli.generator.clone().unwrap_or_else(|| swc.gen_fst.clone());
         let effective_morph = if let Some(m) = &cli.analyser {
