@@ -23,9 +23,14 @@ colored = "3"
 wait-timeout = "0.2"
 which = "8.0"
 indexmap = { version = "2.0", features = ["serde"] }
+mimalloc = { version = "0.1.47", optional = true }
 
 [dev-dependencies]
 tempfile = "3.20"
+
+[features]
+default = []
+mimalloc = ["dep:mimalloc"]
 
 [profile.dev]
 opt-level = 1

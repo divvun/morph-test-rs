@@ -8,6 +8,10 @@ use morph_test::spec::{BackendChoice, load_specs};
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
+#[cfg(feature = "mimalloc")]
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 #[derive(Copy, Clone, Debug, Eq, PartialEq, ValueEnum)]
 enum BackendOpt {
     Auto,
