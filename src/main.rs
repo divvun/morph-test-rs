@@ -311,7 +311,7 @@ fn main() -> Result<()> {
                 }
             }
             if selected.is_empty() {
-                eprintln!("Fann ikkje test med ID/tittel: {}", trimmed);
+                eprintln!("Fann ikkje test med ID/tittel: {trimmed}");
                 eprintln!("Tilgjengelege testar (1-basert):");
                 for (idx, b) in blocks.iter().enumerate() {
                     eprintln!("  {}: {} ({})", idx + 1, b.group, mode_label(&b.dir));
@@ -378,9 +378,9 @@ fn main() -> Result<()> {
                 "All"
             };
             println!("[INFO] Suite         : {}", swc.suite.name);
-            println!("[INFO] Lookup tool   : {}", lookup_full);
-            println!("[INFO] Generator     : {}", gen_full);
-            println!("[INFO] Analyzer      : {}", morph_full);
+            println!("[INFO] Lookup tool   : {lookup_full}");
+            println!("[INFO] Generator     : {gen_full}");
+            println!("[INFO] Analyzer      : {morph_full}");
             println!(
                 "[INFO] Startar testing ({} testar, modus: {})...",
                 swc.suite.cases.len(),

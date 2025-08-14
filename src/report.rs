@@ -29,11 +29,11 @@ fn dash_line(width: usize) -> String {
 }
 
 // Bygg blokker (gruppering per (gruppe, retning)) i encounter-ordning
-fn build_blocks<'a>(
-    cases: &'a [CaseResult],
+fn build_blocks(
+    cases: &[CaseResult],
 ) -> (
     Vec<(String, Direction)>,
-    BTreeMap<(String, Direction), Vec<&'a CaseResult>>,
+    BTreeMap<(String, Direction), Vec<&CaseResult>>,
 ) {
     #[derive(PartialEq, Eq, PartialOrd, Ord)]
     struct Key {
@@ -80,9 +80,9 @@ fn print_human_normal(
         // Tittel-linje
         let title = format!("Test {}: {} ({})", test_idx, key.0, mode_label(&key.1));
         let line = dash_line(title.len());
-        println!("{}", line);
-        println!("{}", title);
-        println!("{}", line);
+        println!("{line}");
+        println!("{title}");
+        println!("{line}");
         let n_cases = cases.len();
         let mut passes = 0usize;
         let mut fails = 0usize;
@@ -175,10 +175,7 @@ fn print_human_normal(
             }
         }
         println!();
-        println!(
-            "Test {} - Passes: {}, Fails: {}, Total: {}",
-            test_idx, passes, fails, total_checks
-        );
+        println!("Test {test_idx} - Passes: {passes}, Fails: {fails}, Total: {total_checks}");
         println!();
         test_idx += 1;
     }
@@ -247,10 +244,7 @@ fn print_human_compact(summary: &Summary, ignore_extra_analyses: bool) {
         total_checks += checks;
         test_idx += 1;
     }
-    println!(
-        "Total passes: {}, Total fails: {}, Total: {}",
-        total_passes, total_fails, total_checks
-    );
+    println!("Total passes: {total_passes}, Total fails: {total_fails}, Total: {total_checks}");
 }
 
 // Nytt: terse-format (prikker/utrop for kvar sjekk, éi line per testblokk, og PASS/FAIL til slutt)
@@ -288,7 +282,7 @@ fn print_human_terse(summary: &Summary, ignore_extra_analyses: bool) {
                 }
             }
         }
-        println!("{}", line);
+        println!("{line}");
     }
     println!("{}", if any_fail { "FAIL" } else { "PASS" });
 }
@@ -331,7 +325,7 @@ fn print_human_final(summary: &Summary, ignore_extra_analyses: bool) {
             }
         }
     }
-    println!("{}/{}/{}", total_passes, total_fails, total_checks);
+    println!("{total_passes}/{total_fails}/{total_checks}");
 }
 
 // Offentleg API: ruter til riktig format

@@ -115,9 +115,7 @@ pub fn load_specs(paths: &[PathBuf], prefer: BackendChoice) -> Result<Vec<SuiteW
                 });
                 // 2) Inverter til analyze: for kvar surface legg til lexical som analyse
                 for surf in expect_vec {
-                    let entry = surface_to_analyses
-                        .entry(surf)
-                        .or_insert_with(BTreeSet::new);
+                    let entry = surface_to_analyses.entry(surf).or_default();
                     entry.insert(lexical_trim.clone());
                 }
             }
@@ -126,7 +124,7 @@ pub fn load_specs(paths: &[PathBuf], prefer: BackendChoice) -> Result<Vec<SuiteW
                 let mut analyses: Vec<String> = analyses_set.into_iter().collect();
                 // Stabil, deterministisk rekkjefølgje
                 analyses.sort();
-                let name = format!("{}: {}", group_name, surface);
+                let name = format!("{group_name}: {surface}");
                 cases.push(TestCase {
                     name,
                     direction: Direction::Analyze,
