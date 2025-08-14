@@ -2,7 +2,6 @@ use crate::types::{CaseResult, Direction, Summary};
 use colored::Colorize;
 use std::collections::{BTreeMap, BTreeSet};
 fn parse_group(name: &str) -> (&str, &str) {
-    // Deler "Group: Input" i ("Group", "Input")
     match name.split_once(": ") {
         Some((g, rest)) => (g, rest),
         None => (name, ""),
@@ -17,7 +16,13 @@ fn mode_label(dir: &Direction) -> &'static str {
 fn dash_line(width: usize) -> String {
     "-".repeat(width)
 }
-pub fn print_human(summary: &Summary, ignore_extra_analyses: bool, verbose: bool) {
+pub fn print_human(
+    summary: &Summary,
+    ignore_extra_analyses: bool,
+    verbose: bool,
+    hide_fails: bool,
+    hide_passes: bool,
+) {
     // Gruppér etter (group, direction) i rekkjefølgje vi møter dei
     #[derive(PartialEq, Eq, PartialOrd, Ord)]
     struct Key {
@@ -59,59 +64,63 @@ pub fn print_human(summary: &Summary, ignore_extra_analyses: bool, verbose: bool
         println!("{}", line);
         println!("{}", title);
         println!("{}", line);
-        // i/n-indeksering: i = posisjon til caset i denne blokka (1-basert), n = talet på cases
         let n_cases = cases.len();
         let mut passes = 0usize;
         let mut fails = 0usize;
-        let mut total_lines = 0usize;
+        let mut total_checks = 0usize; // tel berre forventa/placeholder-liner (ikkje EXTRA)
         for (idx, case) in cases.iter().enumerate() {
             let i = idx + 1;
             let exp_set: BTreeSet<&str> = case.expected.iter().map(|s| s.as_str()).collect();
             let act_set: BTreeSet<&str> = case.actual.iter().map(|s| s.as_str()).collect();
-            // Når expected er tom, skriv placeholder-linje
+            // Når expected er tom, lag ei placeholder-linje
             if case.expected.is_empty() {
                 let placeholder = match case.direction {
                     Direction::Generate => "<No lexical/generation>",
                     Direction::Analyze => "<No surface/analysis>",
                 };
                 let is_pass = match case.direction {
-                    Direction::Analyze if ignore_extra_analyses => true, // godta ekstra analysar
+                    Direction::Analyze if ignore_extra_analyses => true,
                     _ => case.actual.is_empty(),
                 };
-                let status = if is_pass {
+                let status_str = if is_pass {
                     "PASS".green().bold()
                 } else {
                     "FAIL".red().bold()
                 };
-                println!(
-                    "[{}/{}][{}] {} => {}",
-                    i, n_cases, status, case.input, placeholder
-                );
-                total_lines += 1;
+                let hide_line = (is_pass && hide_passes) || (!is_pass && hide_fails);
+                if !hide_line {
+                    println!(
+                        "[{}/{}][{}] {} => {}",
+                        i, n_cases, status_str, case.input, placeholder
+                    );
+                }
+                total_checks += 1;
                 if is_pass {
                     passes += 1;
                 } else {
                     fails += 1;
                 }
-                // Ekstra analysar (verbose + ignore) – vis dei i tillegg
+                // Ekstra analysar (verbose + ignore) – vis som [EXTRA], men ikkje rekn dei inn i teljinga
                 if verbose && ignore_extra_analyses && matches!(case.direction, Direction::Analyze)
                 {
                     let extras: Vec<&str> = act_set.difference(&exp_set).cloned().collect();
-                    for e in extras {
-                        println!(
-                            "[{}/{}][{}] {} => {}",
-                            i,
-                            n_cases,
-                            "EXTRA".yellow().bold(),
-                            case.input,
-                            e
-                        );
-                        total_lines += 1;
+                    if !extras.is_empty() && !hide_passes {
+                        // knytt til PASS/placeholder her
+                        for e in extras {
+                            println!(
+                                "[{}/{}][{}] {} => {}",
+                                i,
+                                n_cases,
+                                "EXTRA".yellow().bold(),
+                                case.input,
+                                e
+                            );
+                        }
                     }
                 }
                 continue;
             }
-            // Éi linje per forventa verdi
+            // Éi linje per forventa verdi (PASS/FAIL)
             for exp in &case.expected {
                 let ok = act_set.contains(exp.as_str());
                 let status = if ok {
@@ -119,8 +128,11 @@ pub fn print_human(summary: &Summary, ignore_extra_analyses: bool, verbose: bool
                 } else {
                     "FAIL".red().bold()
                 };
-                println!("[{}/{}][{}] {} => {}", i, n_cases, status, case.input, exp);
-                total_lines += 1;
+                let hide_line = (ok && hide_passes) || (!ok && hide_fails);
+                if !hide_line {
+                    println!("[{}/{}][{}] {} => {}", i, n_cases, status, case.input, exp);
+                }
+                total_checks += 1;
                 if ok {
                     passes += 1;
                 } else {
@@ -130,23 +142,24 @@ pub fn print_human(summary: &Summary, ignore_extra_analyses: bool, verbose: bool
             // For Analyze: vis ekstra analysar i verbose når -i er aktiv
             if verbose && ignore_extra_analyses && matches!(case.direction, Direction::Analyze) {
                 let extras: Vec<&str> = act_set.difference(&exp_set).cloned().collect();
-                for e in extras {
-                    println!(
-                        "[{}/{}][{}] {} => {}",
-                        i,
-                        n_cases,
-                        "EXTRA".yellow().bold(),
-                        case.input,
-                        e
-                    );
-                    total_lines += 1;
+                if !extras.is_empty() && !hide_passes {
+                    for e in extras {
+                        println!(
+                            "[{}/{}][{}] {} => {}",
+                            i,
+                            n_cases,
+                            "EXTRA".yellow().bold(),
+                            case.input,
+                            e
+                        );
+                    }
                 }
             }
         }
         println!();
         println!(
             "Test {} - Passes: {}, Fails: {}, Total: {}",
-            test_idx, passes, fails, total_lines
+            test_idx, passes, fails, total_checks
         );
         println!();
         test_idx += 1;

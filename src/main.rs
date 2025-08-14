@@ -96,6 +96,21 @@ struct Cli {
         help = "Køyr berre genereringstestar (lexical tags → surface forms)"
     )]
     lexical: bool,
+    // NYTT: filtrering av rapportlinjer
+    #[arg(
+        short = 'f',
+        long = "hide-fails",
+        conflicts_with = "hide_passes",
+        help = "Skjul feil (FAIL), vis berre gjennomgåtte (PASS)"
+    )]
+    hide_fails: bool,
+    #[arg(
+        short = 'p',
+        long = "hide-passes",
+        conflicts_with = "hide_fails",
+        help = "Skjul gjennomgåtte (PASS), vis berre feil (FAIL)"
+    )]
+    hide_passes: bool,
 }
 fn display_path(path: &str) -> String {
     match std::fs::canonicalize(Path::new(path)) {
@@ -114,6 +129,7 @@ fn resolve_lookup_path(cmd: &str) -> String {
 }
 fn main() -> Result<()> {
     let cli = Cli::parse();
+    // Fargar: standard på, --no-color slår av
     if cli.no_color {
         set_color_override(false);
     } else {
@@ -129,7 +145,7 @@ fn main() -> Result<()> {
         );
     }
     for mut swc in suites_with_cfg {
-        // Filtrér cases etter ønskja retning (no finst begge i suite.cases)
+        // Filtrér cases etter ønskja retning
         if cli.surface {
             swc.suite
                 .cases
@@ -142,6 +158,7 @@ fn main() -> Result<()> {
         if swc.suite.cases.is_empty() {
             continue;
         }
+        // Overstyr frå CLI
         let effective_gen = cli.generator.clone().unwrap_or_else(|| swc.gen_fst.clone());
         let effective_morph = if let Some(m) = &cli.analyser {
             Some(m.clone())
@@ -192,7 +209,13 @@ fn main() -> Result<()> {
             );
         }
         if !cli.silent {
-            print_human(&summary, cli.ignore_extra_analyses, cli.verbose);
+            print_human(
+                &summary,
+                cli.ignore_extra_analyses,
+                cli.verbose,
+                cli.hide_fails,
+                cli.hide_passes,
+            );
         }
         aggregate.total += summary.total;
         aggregate.passed += summary.passed;
