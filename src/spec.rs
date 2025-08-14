@@ -153,7 +153,7 @@ fn resolve_backend(
                 .ok_or_else(|| anyhow::anyhow!("Config.hfst.Gen manglar"))?;
             let gen = gen.trim().to_string();
             let morph = h.morph.clone().map(|m| m.trim().to_string());
-            let cmd = "hfst-lookup".to_string();
+            let cmd = "hfst-optimised-lookup".to_string();
             Ok((BackendChoice::Hfst, cmd, gen, morph))
         }
         BackendChoice::Xerox => {
