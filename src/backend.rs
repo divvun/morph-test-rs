@@ -12,7 +12,7 @@ pub struct ExternalBackend {
     pub generator_fst: Option<String>,
     pub analyzer_fst: Option<String>,
     pub timeout: Option<Duration>,
-    pub quiet: bool, // <- ny: demp stderr frå lookup når true
+    pub quiet: bool, // demp stderr frå lookup når true
 }
 pub trait Backend: Send + Sync {
     fn analyze(&self, input: &str) -> Result<Vec<String>>;
@@ -38,7 +38,7 @@ impl ExternalBackend {
                 .stdin
                 .as_mut()
                 .ok_or_else(|| anyhow!("Manglar stdin"))?;
-            let input_trimmed = input.trim(); // trim input før vi sender til lookup
+            let input_trimmed = input.trim();
             stdin.write_all(input_trimmed.as_bytes())?;
             stdin.write_all(b"\n")?;
         }

@@ -26,8 +26,7 @@ pub struct FomaCfg {
     pub morph: Option<String>,
     pub app: Option<String>, // default: flookup
 }
-// Merk: utan rename_all her for å kunne treffe både "hfst"/"Hfst" og "foma"/"Foma".
-// Vi godtek òg "xerox"/"Xerox" som alias for foma (bakoverkompatibilitet).
+// Godtek alias for bakoverkompatibilitet
 #[derive(Debug, Deserialize, Clone)]
 pub struct RawConfig {
     #[serde(alias = "Hfst")]
@@ -42,10 +41,20 @@ pub enum OneOrMany {
     Many(Vec<String>),
 }
 #[derive(Debug, Deserialize, Clone)]
+#[serde(rename_all = "lowercase")]
+pub enum FileMode {
+    #[serde(alias = "generate", alias = "generation", alias = "lexical")]
+    Generate,
+    #[serde(alias = "analyze", alias = "analysis", alias = "surface")]
+    Analyze,
+}
+#[derive(Debug, Deserialize, Clone)]
 #[serde(rename_all = "PascalCase")]
 pub struct RawSpec {
     pub config: Option<RawConfig>,
     pub tests: BTreeMap<String, BTreeMap<String, OneOrMany>>,
+    #[serde(default)]
+    pub mode: Option<FileMode>,
 }
 #[derive(Debug, Clone)]
 pub struct SuiteWithConfig {
@@ -85,6 +94,7 @@ pub fn load_specs(paths: &[PathBuf], prefer: BackendChoice) -> Result<Vec<SuiteW
             .with_context(|| format!("YAML-feil i: {}", f.display()))?;
         let (backend, lookup_cmd, gen_fst, morph_fst) = resolve_backend(&raw, &prefer)
             .with_context(|| format!("Mangelfull eller utydeleg Config i {}", f.display()))?;
+        let suite_mode = raw.mode.clone().unwrap_or(FileMode::Generate);
         let mut cases = Vec::new();
         for (group, map) in &raw.tests {
             let group_name = group.trim();
@@ -97,7 +107,10 @@ pub fn load_specs(paths: &[PathBuf], prefer: BackendChoice) -> Result<Vec<SuiteW
                 let name = format!("{}: {}", group_name, &input_trim);
                 cases.push(TestCase {
                     name,
-                    direction: Direction::Generate,
+                    direction: match suite_mode {
+                        FileMode::Generate => Direction::Generate,
+                        FileMode::Analyze => Direction::Analyze,
+                    },
                     input: input_trim,
                     expect: expect_vec,
                 });
@@ -157,9 +170,10 @@ fn resolve_backend(
             Ok((BackendChoice::Hfst, cmd, gen, morph))
         }
         BackendChoice::Foma => {
-            let x = cfg.foma.as_ref().ok_or_else(|| {
-                anyhow!("Config.foma manglar (eller brukte du 'xerox' utan alias?)")
-            })?;
+            let x = cfg
+                .foma
+                .as_ref()
+                .ok_or_else(|| anyhow!("Config.foma manglar"))?;
             let gen = x
                 .gen
                 .clone()
