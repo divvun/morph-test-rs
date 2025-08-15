@@ -1,8 +1,8 @@
 // tests/order_insensitive.rs
 use anyhow::Result;
-use morph_test::backend::Backend;
-use morph_test::engine::run_suites;
-use morph_test::types::*;
+use morph_test2::backend::Backend;
+use morph_test2::engine::run_suites;
+use morph_test2::types::*;
 
 struct MockBackend;
 
