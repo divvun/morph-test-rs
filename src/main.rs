@@ -2,12 +2,12 @@ use anyhow::Result;
 use clap::{Parser, ValueEnum};
 use colored::control::set_override as set_color_override;
 use futures::future::try_join_all;
-use morph_test::backend::{Backend, DEFAULT_TIMEOUT, ExternalBackend};
-use morph_test::engine::run_suites;
-use morph_test::engine_async::run_suites_async;
-use morph_test::pool::PooledBackend;
-use morph_test::report::{OutputKind, print_human};
-use morph_test::spec::{BackendChoice, load_specs};
+use morph_test2::backend::{Backend, DEFAULT_TIMEOUT, ExternalBackend};
+use morph_test2::engine::run_suites;
+use morph_test2::engine_async::run_suites_async;
+use morph_test2::pool::PooledBackend;
+use morph_test2::report::{OutputKind, print_human};
+use morph_test2::spec::{BackendChoice, load_specs};
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
@@ -213,10 +213,10 @@ fn resolve_lookup_path(cmd: &str) -> String {
     }
 }
 
-fn mode_label(dir: &morph_test::types::Direction) -> &'static str {
+fn mode_label(dir: &morph_test2::types::Direction) -> &'static str {
     match dir {
-        morph_test::types::Direction::Generate => "Lexical/Generation",
-        morph_test::types::Direction::Analyze => "Surface/Analysis",
+        morph_test2::types::Direction::Generate => "Lexical/Generation",
+        morph_test2::types::Direction::Analyze => "Surface/Analysis",
     }
 }
 
@@ -232,7 +232,7 @@ fn group_of_case_name(name: &str) -> &str {
 struct BlockRef {
     suite_idx: usize,
     group: String,
-    dir: morph_test::types::Direction,
+    dir: morph_test2::types::Direction,
 }
 
 #[tokio::main]
@@ -253,18 +253,18 @@ async fn main() -> Result<()> {
         if cli.surface {
             swc.suite
                 .cases
-                .retain(|c| matches!(c.direction, morph_test::types::Direction::Analyze));
+                .retain(|c| matches!(c.direction, morph_test2::types::Direction::Analyze));
         } else if cli.lexical {
             swc.suite
                 .cases
-                .retain(|c| matches!(c.direction, morph_test::types::Direction::Generate));
+                .retain(|c| matches!(c.direction, morph_test2::types::Direction::Generate));
         }
     }
 
     suites.retain(|swc| !swc.suite.cases.is_empty());
     let mut blocks: Vec<BlockRef> = Vec::new();
     for (si, swc) in suites.iter().enumerate() {
-        let mut seen: HashSet<(String, morph_test::types::Direction)> = HashSet::new();
+        let mut seen: HashSet<(String, morph_test2::types::Direction)> = HashSet::new();
         for c in &swc.suite.cases {
             let g = group_of_case_name(&c.name).to_string();
             let key = (g.clone(), c.direction.clone());
@@ -336,7 +336,7 @@ async fn main() -> Result<()> {
         }
         // Filtrer suites til berre valde blokker
         for (si, swc) in suites.iter_mut().enumerate() {
-            let allowed: Vec<(String, morph_test::types::Direction)> = selected
+            let allowed: Vec<(String, morph_test2::types::Direction)> = selected
                 .iter()
                 .filter(|b| b.suite_idx == si)
                 .map(|b| (b.group.clone(), b.dir.clone()))
@@ -354,7 +354,7 @@ async fn main() -> Result<()> {
         suites.retain(|swc| !swc.suite.cases.is_empty());
     }
 
-    let mut aggregate = morph_test::types::Summary::default();
+    let mut aggregate = morph_test2::types::Summary::default();
     if cli.verbose && !cli.silent {
         println!(
             "[INFO] {} v{}",
@@ -385,9 +385,9 @@ async fn main() -> Result<()> {
 }
 
 async fn process_suites_sequential(
-    suites: Vec<morph_test::spec::SuiteWithConfig>,
+    suites: Vec<morph_test2::spec::SuiteWithConfig>,
     cli: &Cli,
-    aggregate: &mut morph_test::types::Summary,
+    aggregate: &mut morph_test2::types::Summary,
 ) -> Result<()> {
     // Køyr per suite
     for swc in suites {
@@ -473,12 +473,12 @@ async fn process_suites_sequential(
 }
 
 async fn process_suites_with_pool(
-    suites: Vec<morph_test::spec::SuiteWithConfig>,
+    suites: Vec<morph_test2::spec::SuiteWithConfig>,
     cli: &Cli,
-    aggregate: &mut morph_test::types::Summary,
+    aggregate: &mut morph_test2::types::Summary,
 ) -> Result<()> {
     // Group suites by backend configuration to share pools
-    let mut backend_groups: HashMap<String, Vec<morph_test::spec::SuiteWithConfig>> =
+    let mut backend_groups: HashMap<String, Vec<morph_test2::spec::SuiteWithConfig>> =
         HashMap::new();
 
     for swc in suites {
@@ -563,7 +563,7 @@ async fn process_suites_with_pool(
                     group_summaries.push(summary);
                 }
 
-                Ok::<Vec<morph_test::types::Summary>, anyhow::Error>(group_summaries)
+                Ok::<Vec<morph_test2::types::Summary>, anyhow::Error>(group_summaries)
             }
         })
         .collect();
