@@ -34,8 +34,13 @@ pub struct CaseResult {
 
 #[derive(Debug, Clone, Default)]
 pub struct Summary {
-    pub total: usize,
-    pub passed: usize,
-    pub failed: usize,
+    pub total: usize,  // Total number of test cases
+    pub passed: usize, // Number of passed test cases
+    pub failed: usize, // Number of failed test cases
     pub cases: Vec<CaseResult>,
+
+    // Expectation-level counts for more granular reporting
+    pub total_expectations: usize,
+    pub passed_expectations: usize,
+    pub failed_expectations: usize,
 }

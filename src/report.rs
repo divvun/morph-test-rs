@@ -94,7 +94,7 @@ fn print_human_normal(
 ) {
     let (seq, groups) = build_blocks(&summary.cases);
     // For kvar blokk (gruppe+retning)
-    let mut test_idx = 1usize; // 1-basert nummerering
+    let mut test_idx = 0usize; // 0-basert nummerering (som Python)
     for key in seq {
         let cases = match groups.get(&key) {
             Some(v) => v,
@@ -167,6 +167,21 @@ fn print_human_normal(
                         }
                     }
                 }
+                // Ekstra analysar som FAIL når -i IKKJE er aktiv
+                if !ignore_extra_analyses && matches!(case.direction, Direction::Analyze) {
+                    let extras: Vec<&str> = act_set.difference(&exp_set).cloned().collect();
+                    if !extras.is_empty() && !hide_fails {
+                        let extras_str = extras.join(", ");
+                        print_failure_detailed(
+                            case,
+                            i,
+                            n_cases,
+                            &format!("Unexpected results: {}", extras_str),
+                        );
+                        total_checks += 1;
+                        fails += 1;
+                    }
+                }
                 continue;
             }
             // Éi linje per forventa verdi (PASS/FAIL)
@@ -210,6 +225,21 @@ fn print_human_normal(
                     }
                 }
             }
+            // For Analyze: vis ekstra analysar som FAIL når -i IKKJE er aktiv
+            if !ignore_extra_analyses && matches!(case.direction, Direction::Analyze) {
+                let extras: Vec<&str> = act_set.difference(&exp_set).cloned().collect();
+                if !extras.is_empty() && !hide_fails {
+                    let extras_str = extras.join(", ");
+                    print_failure_detailed(
+                        case,
+                        i,
+                        n_cases,
+                        &format!("Unexpected results: {}", extras_str),
+                    );
+                    total_checks += 1;
+                    fails += 1;
+                }
+            }
         }
         println!();
         println!("Test {test_idx} - Passes: {passes}, Fails: {fails}, Total: {total_checks}");
@@ -224,7 +254,7 @@ fn print_human_compact(summary: &Summary, ignore_extra_analyses: bool) {
     let mut total_passes = 0usize;
     let mut total_fails = 0usize;
     let mut total_checks = 0usize;
-    let mut test_idx = 1usize; // 1-basert
+    let mut test_idx = 0usize; // 0-basert (som Python)
     for key in seq {
         let cases = match groups.get(&key) {
             Some(v) => v,
@@ -233,31 +263,9 @@ fn print_human_compact(summary: &Summary, ignore_extra_analyses: bool) {
         if cases.is_empty() {
             continue;
         }
-        let mut passes = 0usize;
-        let mut fails = 0usize;
-        let mut checks = 0usize;
-        for case in cases {
-            let act_set: BTreeSet<&str> = case.actual.iter().map(|s| s.as_str()).collect();
-            if case.expected.is_empty() {
-                let is_pass = is_pass_empty_expected(case, ignore_extra_analyses);
-                checks += 1;
-                if is_pass {
-                    passes += 1;
-                } else {
-                    fails += 1;
-                }
-                continue;
-            }
-            for exp in &case.expected {
-                let ok = act_set.contains(exp.as_str());
-                checks += 1;
-                if ok {
-                    passes += 1;
-                } else {
-                    fails += 1;
-                }
-            }
-        }
+
+        let (passes, fails, checks) = calculate_counts(cases, ignore_extra_analyses);
+
         let status = if fails == 0 {
             "[PASS]".green().bold().to_string()
         } else {
@@ -320,28 +328,51 @@ fn print_human_terse(summary: &Summary, ignore_extra_analyses: bool) {
 
 // Nytt: final-format (berre totalsamandrag P/F/T)
 fn print_human_final(summary: &Summary, ignore_extra_analyses: bool) {
-    // Summér globalt
-    let (seq, groups) = build_blocks(&summary.cases);
-    let mut total_passes = 0usize;
-    let mut total_fails = 0usize;
-    let mut total_checks = 0usize;
-    for key in seq {
-        let cases = match groups.get(&key) {
-            Some(v) => v,
-            None => continue,
-        };
-        for case in cases {
-            let act_set: BTreeSet<&str> = case.actual.iter().map(|s| s.as_str()).collect();
-            if case.expected.is_empty() {
-                let is_pass = is_pass_empty_expected(case, ignore_extra_analyses);
-                total_checks += 1;
-                if is_pass {
-                    total_passes += 1;
-                } else {
+    // Use centralized counting function
+    let all_cases: Vec<&CaseResult> = summary.cases.iter().collect();
+    let (total_passes, total_fails, total_checks) =
+        calculate_counts(&all_cases, ignore_extra_analyses);
+    println!("{total_passes}/{total_fails}/{total_checks}");
+}
+
+fn is_pass_empty_expected(case: &CaseResult, ignore_extra_analyses: bool) -> bool {
+    match case.direction {
+        Direction::Analyze if ignore_extra_analyses => true,
+        _ => case.actual.is_empty(),
+    }
+}
+
+// Centralized counting function to ensure consistency across all reporting formats
+pub fn calculate_counts(
+    cases: &[&CaseResult],
+    ignore_extra_analyses: bool,
+) -> (usize, usize, usize) {
+    let mut total_passes = 0;
+    let mut total_fails = 0;
+    let mut total_checks = 0;
+
+    for case in cases {
+        let act_set: BTreeSet<&str> = case.actual.iter().map(|s| s.as_str()).collect();
+
+        if case.expected.is_empty() {
+            let is_pass = is_pass_empty_expected(case, ignore_extra_analyses);
+            total_checks += 1;
+            if is_pass {
+                total_passes += 1;
+            } else {
+                total_fails += 1;
+            }
+
+            // Count extra analyses as failures when not ignoring them
+            if !ignore_extra_analyses && matches!(case.direction, Direction::Analyze) {
+                let exp_set: BTreeSet<&str> = case.expected.iter().map(|s| s.as_str()).collect();
+                let extras: Vec<&str> = act_set.difference(&exp_set).cloned().collect();
+                if !extras.is_empty() {
+                    total_checks += 1;
                     total_fails += 1;
                 }
-                continue;
             }
+        } else {
             for exp in &case.expected {
                 let ok = act_set.contains(exp.as_str());
                 total_checks += 1;
@@ -351,16 +382,20 @@ fn print_human_final(summary: &Summary, ignore_extra_analyses: bool) {
                     total_fails += 1;
                 }
             }
+
+            // Count extra analyses as failures when not ignoring them
+            if !ignore_extra_analyses && matches!(case.direction, Direction::Analyze) {
+                let exp_set: BTreeSet<&str> = case.expected.iter().map(|s| s.as_str()).collect();
+                let extras: Vec<&str> = act_set.difference(&exp_set).cloned().collect();
+                if !extras.is_empty() {
+                    total_checks += 1;
+                    total_fails += 1;
+                }
+            }
         }
     }
-    println!("{total_passes}/{total_fails}/{total_checks}");
-}
 
-fn is_pass_empty_expected(case: &CaseResult, ignore_extra_analyses: bool) -> bool {
-    match case.direction {
-        Direction::Analyze if ignore_extra_analyses => true,
-        _ => case.actual.is_empty(),
-    }
+    (total_passes, total_fails, total_checks)
 }
 
 // Offentleg API: ruter til riktig format

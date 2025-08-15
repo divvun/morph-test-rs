@@ -467,6 +467,9 @@ async fn process_suites_sequential(
         aggregate.total += summary.total;
         aggregate.passed += summary.passed;
         aggregate.failed += summary.failed;
+        aggregate.total_expectations += summary.total_expectations;
+        aggregate.passed_expectations += summary.passed_expectations;
+        aggregate.failed_expectations += summary.failed_expectations;
         aggregate.cases.extend(summary.cases);
     }
     Ok(())
@@ -575,6 +578,9 @@ async fn process_suites_with_pool(
             aggregate.total += summary.total;
             aggregate.passed += summary.passed;
             aggregate.failed += summary.failed;
+            aggregate.total_expectations += summary.total_expectations;
+            aggregate.passed_expectations += summary.passed_expectations;
+            aggregate.failed_expectations += summary.failed_expectations;
             aggregate.cases.extend(summary.cases);
         }
     }

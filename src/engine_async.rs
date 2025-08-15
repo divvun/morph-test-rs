@@ -1,4 +1,5 @@
 use crate::pool::PooledBackend;
+use crate::report::calculate_counts;
 use crate::types::{CaseResult, Direction, Summary, TestSuite};
 use anyhow::Result;
 use std::collections::BTreeSet;
@@ -148,10 +149,19 @@ pub async fn run_suites_async(
 
     let passed = results.iter().filter(|r| r.passed).count();
     let failed = results.len() - passed;
+
+    // Calculate expectation-level counts
+    let results_refs: Vec<&CaseResult> = results.iter().collect();
+    let (passed_expectations, failed_expectations, total_expectations) =
+        calculate_counts(&results_refs, ignore_extra_analyses);
+
     Ok(Summary {
         total: results.len(),
         passed,
         failed,
         cases: results,
+        total_expectations,
+        passed_expectations,
+        failed_expectations,
     })
 }
