@@ -123,10 +123,7 @@ fn print_human_normal(
                     Direction::Generate => "<No lexical/generation>",
                     Direction::Analyze => "<No surface/analysis>",
                 };
-                let is_pass = match case.direction {
-                    Direction::Analyze if ignore_extra_analyses => true,
-                    _ => case.actual.is_empty(),
-                };
+                let is_pass = is_pass_empty_expected(case, ignore_extra_analyses);
                 let _status_str = if is_pass {
                     "PASS".green().bold()
                 } else {
@@ -242,10 +239,7 @@ fn print_human_compact(summary: &Summary, ignore_extra_analyses: bool) {
         for case in cases {
             let act_set: BTreeSet<&str> = case.actual.iter().map(|s| s.as_str()).collect();
             if case.expected.is_empty() {
-                let is_pass = match case.direction {
-                    Direction::Analyze if ignore_extra_analyses => true,
-                    _ => case.actual.is_empty(),
-                };
+                let is_pass = is_pass_empty_expected(case, ignore_extra_analyses);
                 checks += 1;
                 if is_pass {
                     passes += 1;
@@ -304,10 +298,7 @@ fn print_human_terse(summary: &Summary, ignore_extra_analyses: bool) {
         for case in cases {
             let act_set: BTreeSet<&str> = case.actual.iter().map(|s| s.as_str()).collect();
             if case.expected.is_empty() {
-                let is_pass = match case.direction {
-                    Direction::Analyze if ignore_extra_analyses => true,
-                    _ => case.actual.is_empty(),
-                };
+                let is_pass = is_pass_empty_expected(case, ignore_extra_analyses);
                 line.push(if is_pass { '.' } else { '!' });
                 if !is_pass {
                     any_fail = true;
@@ -342,10 +333,7 @@ fn print_human_final(summary: &Summary, ignore_extra_analyses: bool) {
         for case in cases {
             let act_set: BTreeSet<&str> = case.actual.iter().map(|s| s.as_str()).collect();
             if case.expected.is_empty() {
-                let is_pass = match case.direction {
-                    Direction::Analyze if ignore_extra_analyses => true,
-                    _ => case.actual.is_empty(),
-                };
+                let is_pass = is_pass_empty_expected(case, ignore_extra_analyses);
                 total_checks += 1;
                 if is_pass {
                     total_passes += 1;
@@ -366,6 +354,13 @@ fn print_human_final(summary: &Summary, ignore_extra_analyses: bool) {
         }
     }
     println!("{total_passes}/{total_fails}/{total_checks}");
+}
+
+fn is_pass_empty_expected(case: &CaseResult, ignore_extra_analyses: bool) -> bool {
+    match case.direction {
+        Direction::Analyze if ignore_extra_analyses => true,
+        _ => case.actual.is_empty(),
+    }
 }
 
 // Offentleg API: ruter til riktig format
