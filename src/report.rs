@@ -256,6 +256,12 @@ fn print_human_normal(
         println!();
         test_idx += 1;
     }
+
+    // Print overall summary like Python does
+    let all_cases: Vec<&CaseResult> = summary.cases.iter().collect();
+    let (total_passes, total_fails, total_checks) =
+        calculate_counts(&all_cases, ignore_extra_analyses);
+    println!("Total passes: {total_passes}, Total fails: {total_fails}, Total: {total_checks}");
 }
 
 // Nytt: compact-format
