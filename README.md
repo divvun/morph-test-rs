@@ -23,7 +23,7 @@ For usage instructions, see the link above to `morph-test`.
 
 - in test reports, test suites are numbered starting from 1. `morph-test` is starting from 0.
 - when running individual tests, one can refer to the tests both by name (ID in the yaml file) and by number. To list all available tests, specify one of `0`, `null` or `liste` as the name of the test.
-- verbose mode give some more information than the original `morph-test`
+- verbose mode gives some more information than the original `morph-test`
 - the tool can take a file name pattern or a directory as argument, and will then run all test files matching the pattern or in the specified directory
 - the flag `--pool` enables further multiprocessing features and thus more speed-up
 
