@@ -30,13 +30,15 @@ fn dash_line(width: usize) -> String {
 }
 
 fn print_failure_detailed(case: &CaseResult, i: usize, n_cases: usize, expected_item: &str) {
+    let width = n_cases.to_string().len();
     println!(
-        "[{}/{}][{}] {} => {}",
+        "[{:>width$}/{:>width$}][{}] {} => {}",
         i,
         n_cases,
         "FAIL".red().bold(),
         case.input,
-        expected_item
+        expected_item,
+        width = width
     );
 
     if let Some(error) = &case.error {
@@ -131,14 +133,16 @@ fn print_human_normal(
                 };
                 let hide_line = (is_pass && hide_passes) || (!is_pass && hide_fails);
                 if !hide_line {
+                    let width = n_cases.to_string().len();
                     if is_pass {
                         println!(
-                            "[{}/{}][{}] {} => {}",
+                            "[{:>width$}/{:>width$}][{}] {} => {}",
                             i,
                             n_cases,
                             "PASS".green().bold(),
                             case.input,
-                            placeholder
+                            placeholder,
+                            width = width
                         );
                     } else {
                         print_failure_detailed(case, i, n_cases, placeholder);
@@ -155,14 +159,16 @@ fn print_human_normal(
                 {
                     let extras: Vec<&str> = act_set.difference(&exp_set).cloned().collect();
                     if !extras.is_empty() && !hide_passes {
+                        let width = n_cases.to_string().len();
                         for e in extras {
                             println!(
-                                "[{}/{}][{}] {} => {}",
+                                "[{:>width$}/{:>width$}][{}] {} => {}",
                                 i,
                                 n_cases,
                                 "EXTRA".yellow().bold(),
                                 case.input,
-                                e
+                                e,
+                                width = width
                             );
                         }
                     }
@@ -189,14 +195,16 @@ fn print_human_normal(
                 let ok = act_set.contains(exp.as_str());
                 let hide_line = (ok && hide_passes) || (!ok && hide_fails);
                 if !hide_line {
+                    let width = n_cases.to_string().len();
                     if ok {
                         println!(
-                            "[{}/{}][{}] {} => {}",
+                            "[{:>width$}/{:>width$}][{}] {} => {}",
                             i,
                             n_cases,
                             "PASS".green().bold(),
                             case.input,
-                            exp
+                            exp,
+                            width = width
                         );
                     } else {
                         print_failure_detailed(case, i, n_cases, exp);
@@ -213,14 +221,16 @@ fn print_human_normal(
             if verbose && ignore_extra_analyses && matches!(case.direction, Direction::Analyze) {
                 let extras: Vec<&str> = act_set.difference(&exp_set).cloned().collect();
                 if !extras.is_empty() && !hide_passes {
+                    let width = n_cases.to_string().len();
                     for e in extras {
                         println!(
-                            "[{}/{}][{}] {} => {}",
+                            "[{:>width$}/{:>width$}][{}] {} => {}",
                             i,
                             n_cases,
                             "EXTRA".yellow().bold(),
                             case.input,
-                            e
+                            e,
+                            width = width
                         );
                     }
                 }
