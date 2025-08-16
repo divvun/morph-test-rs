@@ -1,6 +1,6 @@
 # CLI help text
 cli-about = Morphological test runner (surface/analyze and lexical/generate)
-cli-backend = Select backend/section (hfst or foma) [alias: -S/--section]
+cli-backend = Select FST format/section (hfst or foma) [alias: -S/--section]
 cli-generator = Override generator FST (.hfstol for HFST, .foma for Foma) [alias: --gen]
 cli-analyser = Override analyser FST (.hfstol for HFST, .foma for Foma) [alias: --morph, --analyzer]
 cli-silent = Silent mode: no output, and suppress stderr from lookup
