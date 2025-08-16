@@ -42,7 +42,7 @@ info-finished = Finished: passed {$passed}, failed {$failed}. Writing report...
 info-all-finished = All test runs finished. Total: {$total}, Passed: {$passed}, Failed: {$failed}
 
 # Test listing
-available-tests = Available tests (1-based):
+available-tests = Available tests:
 test-list-item = {$index}: {$group} ({$direction})
 
 # Report labels

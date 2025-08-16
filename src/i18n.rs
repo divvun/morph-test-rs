@@ -26,7 +26,6 @@ pub fn t_with_args(key: &str, args: &[(&str, &dyn std::fmt::Display)]) -> String
 #[derive(Debug)]
 pub struct Localizer {
     messages: HashMap<String, String>,
-    current_language: String,
 }
 
 impl Localizer {
@@ -36,7 +35,6 @@ impl Localizer {
 
         Self {
             messages,
-            current_language,
         }
     }
 
@@ -96,8 +94,8 @@ impl Localizer {
 
     fn get(&self, key: &str) -> String {
         self.messages.get(key).cloned().unwrap_or_else(|| {
-            eprintln!("Missing translation key: {}", key);
-            format!("MISSING: {}", key)
+            eprintln!("Missing translation key: {key}");
+            format!("MISSING: {key}")
         })
     }
 
@@ -106,8 +104,8 @@ impl Localizer {
 
         // Simple string replacement for {$var} patterns
         for (var_name, value) in args {
-            let placeholder = format!("{{${}}}", var_name);
-            message = message.replace(&placeholder, &format!("{}", value));
+            let placeholder = format!("{{${var_name}}}");
+            message = message.replace(&placeholder, &format!("{value}"));
         }
 
         message

@@ -13,7 +13,6 @@ use morph_test2::{t, t_args};
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use tracing::{error, info};
-use tracing_subscriber;
 
 #[cfg(feature = "mimalloc")]
 #[global_allocator]
