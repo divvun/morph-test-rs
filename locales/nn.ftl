@@ -1,11 +1,11 @@
 # CLI help text
-cli-about = Morfologisk testløypar (overflate/analyser og leksikalsk/generering)
-cli-backend = Vel backend/seksjon (hfst eller foma) [alias: -S/--section]
+cli-about = Morfologisk testkøyrar (overflate/analyse og leksikalsk/generering)
+cli-backend = Vel fst-format/seksjon (hfst eller foma) [alias: -S/--section]
 cli-generator = Overstyr generator-FST (.hfstol for HFST, .foma for Foma) [alias: --gen]
-cli-analyser = Overstyr analyser-FST (.hfstol for HFST, .foma for Foma) [alias: --morph, --analyzer]
-cli-silent = Stille modus: ingen utskrift, og demp stderr frå lookup
+cli-analyser = Overstyr analyse-FST (.hfstol for HFST, .foma for Foma) [alias: --morph, --analyzer]
+cli-silent = Stille modus: inga utskrift, og demp stderr frå lookup
 cli-lookup-tool = Overstyr lookup-kommando (t.d. hfst-optimised-lookup, flookup) [alias: --app]
-cli-ignore-extra = Analyze-testar: godkjenn når alle forventa analysar finst, sjølv om det finst ekstra analysar
+cli-ignore-extra = Analysetestar: godkjenn når alle forventa analysar finst, sjølv om det finst ekstra analysar
 cli-color = Tving fargar på (standard er fargar på)
 cli-no-color = Slå av fargar i rapporten (overstyrer --color)
 cli-verbose = Vis metadata (lookup med full sti, generator/analyzer med fulle stiar, versjon) og framdriftsmeldingar. Viser òg 'EXTRA' for Analyze-PASS når -i er aktiv.
