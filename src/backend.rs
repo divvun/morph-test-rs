@@ -85,6 +85,11 @@ impl ExternalBackend {
         let stdout = String::from_utf8_lossy(&out.stdout);
         let mut results_map: IndexMap<String, Vec<String>> = IndexMap::new();
 
+        // Initialize all inputs in the map to preserve order and handle no-result cases
+        for input in inputs {
+            results_map.insert(input.trim().to_string(), Vec::new());
+        }
+
         for raw_line in stdout.lines() {
             let trimmed = raw_line.trim();
             if trimmed.is_empty() {
@@ -98,8 +103,17 @@ impl ExternalBackend {
             if cols.len() >= 2 {
                 let input = cols[0].trim().to_string();
                 let output = cols[1].trim().to_string();
+
+                // Handle +inf (no result) marker
+                if output == "+inf" {
+                    // Input with no results - already initialized as empty Vec
+                    continue;
+                }
+
                 if !output.is_empty() && output != "@" {
-                    results_map.entry(input).or_default().push(output);
+                    if let Some(results) = results_map.get_mut(&input) {
+                        results.push(output);
+                    }
                 }
             }
         }

@@ -31,15 +31,23 @@ impl FstProcess {
         // Read results - FST tools output input\toutput format
         let mut results_map: IndexMap<String, Vec<String>> = IndexMap::new();
         let mut lines_read = 0;
-        let expected_inputs: std::collections::HashSet<&str> =
+        let _expected_inputs: std::collections::HashSet<&str> =
             inputs.iter().map(|s| s.trim()).collect();
 
-        // Read until we have results for all inputs or timeout
+        // Initialize all inputs in the map to preserve order and handle no-result cases
+        for input in inputs {
+            results_map.insert(input.trim().to_string(), Vec::new());
+        }
+
+        // Read all available output until timeout or reasonable limit
         let mut line = String::new();
-        while lines_read < inputs.len() * 10 {
-            // Reasonable upper bound
+        let max_lines = inputs.len() * 50; // More generous limit for multiple results per input
+
+        while lines_read < max_lines {
             line.clear();
-            match tokio::time::timeout(DEFAULT_TIMEOUT, self.stdout.read_line(&mut line)).await {
+            match tokio::time::timeout(Duration::from_millis(500), self.stdout.read_line(&mut line))
+                .await
+            {
                 Ok(Ok(0)) => break, // EOF
                 Ok(Ok(_)) => {
                     lines_read += 1;
@@ -47,6 +55,7 @@ impl FstProcess {
                     if trimmed.is_empty() {
                         continue;
                     }
+
                     if trimmed.starts_with('!') || trimmed.starts_with('#') {
                         continue;
                     }
@@ -55,18 +64,25 @@ impl FstProcess {
                     if cols.len() >= 2 {
                         let input = cols[0].trim().to_string();
                         let output = cols[1].trim().to_string();
+
+                        // Handle +inf (no result) marker
+                        if output == "+inf" {
+                            // Input with no results - already initialized as empty Vec
+                            continue;
+                        }
+
                         if !output.is_empty() && output != "@" {
-                            results_map.entry(input).or_default().push(output);
+                            if let Some(results) = results_map.get_mut(&input) {
+                                results.push(output);
+                            }
                         }
                     }
                 }
                 Ok(Err(e)) => return Err(anyhow!("IO error reading from process: {}", e)),
-                Err(_) => return Err(anyhow!("Timeout reading from FST process")),
-            }
-
-            // Check if we have at least one result for each input
-            if results_map.keys().len() >= expected_inputs.len() {
-                break;
+                Err(_) => {
+                    // Timeout is expected when no more output is available
+                    break;
+                }
             }
         }
 

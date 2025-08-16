@@ -359,55 +359,50 @@ fn is_pass_empty_expected(case: &CaseResult, ignore_extra_analyses: bool) -> boo
 }
 
 // Centralized counting function to ensure consistency across all reporting formats
+// Counts test cases (not individual expectations) like Python version does
 pub fn calculate_counts(
     cases: &[&CaseResult],
     ignore_extra_analyses: bool,
 ) -> (usize, usize, usize) {
     let mut total_passes = 0;
     let mut total_fails = 0;
-    let mut total_checks = 0;
+    let total_checks = cases.len();
 
     for case in cases {
         let act_set: BTreeSet<&str> = case.actual.iter().map(|s| s.as_str()).collect();
 
-        if case.expected.is_empty() {
-            let is_pass = is_pass_empty_expected(case, ignore_extra_analyses);
-            total_checks += 1;
-            if is_pass {
-                total_passes += 1;
-            } else {
-                total_fails += 1;
-            }
+        // Determine if this test case passes or fails as a whole
+        let case_passes = if case.expected.is_empty() {
+            // Empty expected case
+            let base_pass = is_pass_empty_expected(case, ignore_extra_analyses);
 
-            // Count extra analyses as failures when not ignoring them
-            if !ignore_extra_analyses && matches!(case.direction, Direction::Analyze) {
-                let exp_set: BTreeSet<&str> = case.expected.iter().map(|s| s.as_str()).collect();
-                let extras: Vec<&str> = act_set.difference(&exp_set).cloned().collect();
-                if !extras.is_empty() {
-                    total_checks += 1;
-                    total_fails += 1;
-                }
+            // If not ignoring extra analyses for analyze direction, also check for extras
+            if !ignore_extra_analyses
+                && matches!(case.direction, Direction::Analyze)
+                && !case.actual.is_empty()
+            {
+                false // Any extra analyses make the case fail
+            } else {
+                base_pass
             }
         } else {
-            for exp in &case.expected {
-                let ok = act_set.contains(exp.as_str());
-                total_checks += 1;
-                if ok {
-                    total_passes += 1;
-                } else {
-                    total_fails += 1;
-                }
-            }
+            // Non-empty expected case: ALL expectations must be met
+            let exp_set: BTreeSet<&str> = case.expected.iter().map(|s| s.as_str()).collect();
+            let all_expected_found = exp_set.iter().all(|exp| act_set.contains(exp));
 
-            // Count extra analyses as failures when not ignoring them
+            // If not ignoring extra analyses for analyze direction, also check for extras
             if !ignore_extra_analyses && matches!(case.direction, Direction::Analyze) {
-                let exp_set: BTreeSet<&str> = case.expected.iter().map(|s| s.as_str()).collect();
                 let extras: Vec<&str> = act_set.difference(&exp_set).cloned().collect();
-                if !extras.is_empty() {
-                    total_checks += 1;
-                    total_fails += 1;
-                }
+                all_expected_found && extras.is_empty()
+            } else {
+                all_expected_found
             }
+        };
+
+        if case_passes {
+            total_passes += 1;
+        } else {
+            total_fails += 1;
         }
     }
 

@@ -188,12 +188,12 @@ struct Cli {
     )]
     output: OutputFormat,
 
-    // Process pool parallel execution
+    // Serial execution (opt-out of default parallel processing)
     #[arg(
-        long = "pool",
-        help = "Bruk process pool for parallell køyring (raskare for mange tester)"
+        long = "serial",
+        help = "Bruk seriell køyring i staden for parallell processing (standardverdi er parallell)"
     )]
-    use_pool: bool,
+    use_serial: bool,
 }
 
 fn display_path(path: &str) -> String {
@@ -362,12 +362,12 @@ async fn main() -> Result<()> {
             env!("CARGO_PKG_VERSION")
         );
     }
-    if cli.use_pool {
-        // Use process pool for parallel execution
-        process_suites_with_pool(suites, &cli, &mut aggregate).await?;
-    } else {
+    if cli.use_serial {
         // Use traditional sequential processing
         process_suites_sequential(suites, &cli, &mut aggregate).await?;
+    } else {
+        // Use process pool for parallel execution (default)
+        process_suites_with_pool(suites, &cli, &mut aggregate).await?;
     }
 
     if cli.verbose && !cli.silent {
@@ -538,7 +538,7 @@ async fn process_suites_with_pool(
                 let mut group_summaries = Vec::new();
                 for swc in group_suites {
                     if cli.verbose && !cli.silent {
-                        println!("[INFO] Suite: {} (pool processing)...", swc.suite.name);
+                        println!("[INFO] Suite: {} (parallel processing)...", swc.suite.name);
                     }
 
                     let summary =
