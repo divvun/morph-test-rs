@@ -3,6 +3,7 @@ use indexmap::IndexMap;
 use std::io::Write;
 use std::process::{Command, Stdio};
 use std::time::Duration;
+use tracing::debug;
 use wait_timeout::ChildExt;
 
 /// 30 sekund per oppslag
@@ -27,6 +28,11 @@ pub trait Backend: Send + Sync {
 impl ExternalBackend {
     fn run_lookup_batch(&self, fst: &str, inputs: &[String]) -> Result<Vec<Vec<String>>> {
         let timeout = self.timeout.unwrap_or(DEFAULT_TIMEOUT);
+        debug!(
+            "Running batch lookup with {} inputs using FST: {}",
+            inputs.len(),
+            fst
+        );
 
         let mut cmd = Command::new(&self.lookup_cmd);
         cmd.arg(fst)
@@ -126,6 +132,11 @@ impl ExternalBackend {
             all_results.push(results);
         }
 
+        debug!(
+            "Batch lookup completed: {} inputs processed, {} total results",
+            inputs.len(),
+            all_results.iter().map(|r| r.len()).sum::<usize>()
+        );
         Ok(all_results)
     }
 }

@@ -6,6 +6,7 @@ use std::process::Stdio;
 use std::time::Duration;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader, BufWriter};
 use tokio::process::{Child, ChildStdin, ChildStdout, Command};
+use tracing::debug;
 
 /// 30 sekund per oppslag
 pub const DEFAULT_TIMEOUT: Duration = Duration::from_secs(30);
@@ -20,6 +21,7 @@ pub struct FstProcess {
 impl FstProcess {
     /// Send a batch of inputs and read results
     pub async fn process_batch(&mut self, inputs: &[String]) -> Result<Vec<Vec<String>>> {
+        debug!("Pool process batch: processing {} inputs", inputs.len());
         // Send all inputs
         for input in inputs {
             let input_trimmed = input.trim();
@@ -94,6 +96,11 @@ impl FstProcess {
             all_results.push(results);
         }
 
+        debug!(
+            "Pool batch completed: {} inputs processed, {} total results",
+            inputs.len(),
+            all_results.iter().map(|r| r.len()).sum::<usize>()
+        );
         Ok(all_results)
     }
 }

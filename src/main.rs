@@ -10,6 +10,8 @@ use morph_test2::report::{OutputKind, print_human};
 use morph_test2::spec::{BackendChoice, load_specs};
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
+use tracing::{error, info};
+use tracing_subscriber;
 
 #[cfg(feature = "mimalloc")]
 #[global_allocator]
@@ -238,6 +240,18 @@ struct BlockRef {
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
+
+    // Initialize tracing based on verbose flag and environment
+    let filter = if cli.verbose {
+        // With -v, show INFO and above, but allow RUST_LOG to override for debug/trace
+        std::env::var("RUST_LOG").unwrap_or_else(|_| "morph_test2=info".to_string())
+    } else {
+        // Without -v, only show warnings and errors
+        std::env::var("RUST_LOG").unwrap_or_else(|_| "morph_test2=warn".to_string())
+    };
+
+    tracing_subscriber::fmt().with_env_filter(filter).init();
+
     // Fargar: standard på, --no-color slår av
     if cli.no_color {
         set_color_override(false);
@@ -281,7 +295,7 @@ async fn main() -> Result<()> {
     // -t/--test: spesial 0/null/liste => list opp og avslutt
     if let Some(sel) = &cli.test {
         if blocks.is_empty() {
-            eprintln!("Ingen testar tilgjengeleg etter filtrering.");
+            error!("Ingen testar tilgjengeleg etter filtrering.");
             std::process::exit(2);
         }
         let trimmed = sel.trim();
@@ -299,7 +313,7 @@ async fn main() -> Result<()> {
         let mut selected: Vec<BlockRef> = Vec::new();
         if let Ok(n) = trimmed.parse::<usize>() {
             if n == 0 || n > blocks.len() {
-                eprintln!(
+                error!(
                     "Ugyldig testnummer {}. Gyldig område: 1..{}.",
                     n,
                     blocks.len()
@@ -326,7 +340,7 @@ async fn main() -> Result<()> {
                 }
             }
             if selected.is_empty() {
-                eprintln!("Fann ikkje test med ID/tittel: {trimmed}");
+                error!("Fann ikkje test med ID/tittel: {trimmed}");
                 eprintln!("Tilgjengelege testar (1-basert):");
                 for (idx, b) in blocks.iter().enumerate() {
                     eprintln!("  {}: {} ({})", idx + 1, b.group, mode_label(&b.dir));
@@ -356,11 +370,7 @@ async fn main() -> Result<()> {
 
     let mut aggregate = morph_test2::types::Summary::default();
     if cli.verbose && !cli.silent {
-        println!(
-            "[INFO] {} v{}",
-            env!("CARGO_PKG_NAME"),
-            env!("CARGO_PKG_VERSION")
-        );
+        info!("{} v{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
     }
     if cli.use_serial {
         // Use traditional sequential processing
@@ -371,8 +381,8 @@ async fn main() -> Result<()> {
     }
 
     if cli.verbose && !cli.silent {
-        println!(
-            "[INFO] Alle testkøyringar ferdige. Total: {}, Passed: {}, Failed: {}",
+        info!(
+            "Alle testkøyringar ferdige. Total: {}, Passed: {}, Failed: {}",
             aggregate.total, aggregate.passed, aggregate.failed
         );
     }
@@ -419,12 +429,12 @@ async fn process_suites_sequential(
             } else {
                 "All"
             };
-            println!("[INFO] Suite         : {}", swc.suite.name);
-            println!("[INFO] Lookup tool   : {lookup_full}");
-            println!("[INFO] Generator     : {gen_full}");
-            println!("[INFO] Analyzer      : {morph_full}");
-            println!(
-                "[INFO] Startar testing ({} testar, modus: {}) (batch processing)...",
+            info!("Suite         : {}", swc.suite.name);
+            info!("Lookup tool   : {lookup_full}");
+            info!("Generator     : {gen_full}");
+            info!("Analyzer      : {morph_full}");
+            info!(
+                "Startar testing ({} testar, modus: {}) (batch processing)...",
                 swc.suite.cases.len(),
                 mode_txt
             );
@@ -440,15 +450,15 @@ async fn process_suites_sequential(
 
         // Validate backend before running tests - fail fast on configuration errors
         if let Err(e) = backend.validate() {
-            eprintln!("Feil: {e}");
+            error!("Feil: {e}");
             std::process::exit(2);
         }
 
         let summary = run_suites(&backend, &[swc.suite], cli.ignore_extra_analyses);
 
         if cli.verbose && !cli.silent {
-            println!(
-                "[INFO] Ferdig: passed {}, failed {}. Skriv rapport...",
+            info!(
+                "Ferdig: passed {}, failed {}. Skriv rapport...",
                 summary.passed, summary.failed
             );
         }
@@ -538,7 +548,7 @@ async fn process_suites_with_pool(
                 let mut group_summaries = Vec::new();
                 for swc in group_suites {
                     if cli.verbose && !cli.silent {
-                        println!("[INFO] Suite: {} (parallel processing)...", swc.suite.name);
+                        info!("Suite: {} (parallel processing)...", swc.suite.name);
                     }
 
                     let summary =
@@ -546,8 +556,8 @@ async fn process_suites_with_pool(
                             .await?;
 
                     if cli.verbose && !cli.silent {
-                        println!(
-                            "[INFO] Ferdig: passed {}, failed {}. Skriv rapport...",
+                        info!(
+                            "Ferdig: passed {}, failed {}. Skriv rapport...",
                             summary.passed, summary.failed
                         );
                     }
