@@ -65,7 +65,7 @@ struct Key {
     dir: Direction,
 }
 
-// Bygg blokker (gruppering per (gruppe, retning)) i encounter-ordning
+// Build blocks (grouping per (group, direction)) in encounter order
 #[allow(clippy::type_complexity)]
 fn build_blocks(
     cases: &[CaseResult],
@@ -91,7 +91,7 @@ fn build_blocks(
     (seq, groups)
 }
 
-// Intern: normal-formatet (dagens format)
+// Internal: normal format (current format)
 fn print_human_normal(
     summary: &Summary,
     ignore_extra_analyses: bool,
@@ -100,8 +100,8 @@ fn print_human_normal(
     hide_passes: bool,
 ) {
     let (seq, groups) = build_blocks(&summary.cases);
-    // For kvar blokk (gruppe+retning)
-    let mut test_idx = 1usize; // 1-basert nummerering
+    // For each block (group+direction)
+    let mut test_idx = 1usize; // 1-based numbering
     for key in seq {
         let cases = match groups.get(&key) {
             Some(v) => v,
@@ -110,7 +110,7 @@ fn print_human_normal(
         if cases.is_empty() {
             continue;
         }
-        // Tittel-linje
+        // Title line
         let title = t_args!("report-test-header",
             "index" => test_idx,
             "group" => &key.0,
@@ -123,12 +123,12 @@ fn print_human_normal(
         let n_cases = cases.len();
         let mut passes = 0usize;
         let mut fails = 0usize;
-        let mut total_checks = 0usize; // tel berre forventa/placeholder-liner (ikkje EXTRA)
+        let mut total_checks = 0usize; // count only expected/placeholder lines (not EXTRA)
         for (idx, case) in cases.iter().enumerate() {
             let i = idx + 1;
             let exp_set: BTreeSet<&str> = case.expected.iter().map(|s| s.as_str()).collect();
             let act_set: BTreeSet<&str> = case.actual.iter().map(|s| s.as_str()).collect();
-            // Når expected er tom, lag ei placeholder-linje
+            // When expected is empty, create a placeholder line
             if case.expected.is_empty() {
                 let placeholder = match case.direction {
                     Direction::Generate => t!("report-no-lexical"),
@@ -163,7 +163,7 @@ fn print_human_normal(
                 } else {
                     fails += 1;
                 }
-                // Ekstra analysar (verbose + ignore) – vis som [EXTRA], men ikkje rekn dei inn i teljinga
+                // Extra analyses (verbose + ignore) – show as [EXTRA], but don't count them in totals
                 if verbose && ignore_extra_analyses && matches!(case.direction, Direction::Analyze)
                 {
                     let extras: Vec<&str> = act_set.difference(&exp_set).cloned().collect();
@@ -182,7 +182,7 @@ fn print_human_normal(
                         }
                     }
                 }
-                // Ekstra analysar som FAIL når -i IKKJE er aktiv
+                // Extra analyses as FAIL when -i is NOT active
                 if !ignore_extra_analyses && matches!(case.direction, Direction::Analyze) {
                     let extras: Vec<&str> = act_set.difference(&exp_set).cloned().collect();
                     if !extras.is_empty() && !hide_fails {
@@ -199,7 +199,7 @@ fn print_human_normal(
                 }
                 continue;
             }
-            // Éi linje per forventa verdi (PASS/FAIL)
+            // One line per expected value (PASS/FAIL)
             for exp in &case.expected {
                 let ok = act_set.contains(exp.as_str());
                 let hide_line = (ok && hide_passes) || (!ok && hide_fails);
@@ -226,7 +226,7 @@ fn print_human_normal(
                     fails += 1;
                 }
             }
-            // For Analyze: vis ekstra analysar i verbose når -i er aktiv
+            // For Analyze: show extra analyses in verbose when -i is active
             if verbose && ignore_extra_analyses && matches!(case.direction, Direction::Analyze) {
                 let extras: Vec<&str> = act_set.difference(&exp_set).cloned().collect();
                 if !extras.is_empty() && !hide_passes {
@@ -244,7 +244,7 @@ fn print_human_normal(
                     }
                 }
             }
-            // For Analyze: vis ekstra analysar som FAIL når -i IKKJE er aktiv
+            // For Analyze: show extra analyses as FAIL when -i is NOT active
             if !ignore_extra_analyses && matches!(case.direction, Direction::Analyze) {
                 let extras: Vec<&str> = act_set.difference(&exp_set).cloned().collect();
                 if !extras.is_empty() && !hide_fails {
@@ -288,13 +288,13 @@ fn print_human_normal(
     );
 }
 
-// Nytt: compact-format
+// New: compact format
 fn print_human_compact(summary: &Summary, ignore_extra_analyses: bool) {
     let (seq, groups) = build_blocks(&summary.cases);
     let mut total_passes = 0usize;
     let mut total_fails = 0usize;
     let mut total_checks = 0usize;
-    let mut test_idx = 1usize; // 1-basert
+    let mut test_idx = 1usize; // 1-based
     for key in seq {
         let cases = match groups.get(&key) {
             Some(v) => v,
@@ -343,7 +343,7 @@ fn print_human_compact(summary: &Summary, ignore_extra_analyses: bool) {
     );
 }
 
-// Nytt: terse-format (prikker/utrop for kvar sjekk, éi line per testblokk, og PASS/FAIL til slutt)
+// New: terse format (dots/exclamations for each check, one line per test block, and PASS/FAIL at the end)
 fn print_human_terse(summary: &Summary, ignore_extra_analyses: bool) {
     let (seq, groups) = build_blocks(&summary.cases);
     let mut any_fail = false;
@@ -387,7 +387,7 @@ fn print_human_terse(summary: &Summary, ignore_extra_analyses: bool) {
     );
 }
 
-// Nytt: final-format (berre totalsamandrag P/F/T)
+// New: final format (only total summary P/F/T)
 fn print_human_final(summary: &Summary, ignore_extra_analyses: bool) {
     // Use centralized counting function
     let all_cases: Vec<&CaseResult> = summary.cases.iter().collect();
@@ -461,7 +461,7 @@ pub fn calculate_counts(
     (total_passes, total_fails, total_checks)
 }
 
-// Offentleg API: ruter til riktig format
+// Public API: routes to correct format
 pub fn print_human(
     summary: &Summary,
     ignore_extra_analyses: bool,
@@ -481,15 +481,15 @@ pub fn print_human(
             );
         }
         OutputKind::Compact => {
-            // compact bryr seg ikkje om verbose/hide-flagg; skriv testlinjer + totalsamandrag
+            // compact doesn't care about verbose/hide flags; writes test lines + total summary
             print_human_compact(summary, ignore_extra_analyses);
         }
         OutputKind::Terse => {
-            // terse: prikker/utrop per sjekk, PASS/FAIL til slutt
+            // terse: dots/exclamations per check, PASS/FAIL at the end
             print_human_terse(summary, ignore_extra_analyses);
         }
         OutputKind::Final => {
-            // final: berre totalsamandrag P/F/T
+            // final: only total summary P/F/T
             print_human_final(summary, ignore_extra_analyses);
         }
     }

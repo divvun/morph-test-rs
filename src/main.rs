@@ -58,11 +58,11 @@ impl From<OutputFormat> for OutputKind {
     about = "Morphological test runner (surface/analyze and lexical/generate)"
 )]
 struct Cli {
-    // TEST_PATHS: ei eller fleire YAML-filer/mapper med testdata
+    // TEST_PATHS: one or more YAML files/directories with test data
     #[arg(value_name = "TEST_PATHS", required = true)]
     tests: Vec<PathBuf>,
 
-    // Backend-val: standard HFST. Alias for bakoverkompatibilitet: -S / --section
+    // Backend choice: default HFST. Alias for backward compatibility: -S / --section
     #[arg(
         long,
         value_enum,
@@ -73,7 +73,7 @@ struct Cli {
     )]
     backend: BackendOpt,
 
-    // Overstyr generator-FST
+    // Override generator FST
     #[arg(
         long,
         value_name = "FILE",
@@ -82,7 +82,7 @@ struct Cli {
     )]
     generator: Option<String>,
 
-    // Overstyr analyser-FST
+    // Override analyser FST
     #[arg(
         long,
         value_name = "FILE",
@@ -91,14 +91,14 @@ struct Cli {
     )]
     analyser: Option<String>,
 
-    // Stille-modus
+    // Silent mode
     #[arg(
         short = 'q',
         long = "silent",
         help = "Stille modus: ingen utskrift, og demp stderr frå lookup"
     )]
     silent: bool,
-    // Overstyr lookup-kommandoen
+    // Override lookup command
     #[arg(
         long = "lookup-tool",
         value_name = "CMD",
@@ -107,7 +107,7 @@ struct Cli {
     )]
     lookup_tool: Option<String>,
 
-    // Ignorer ekstra analysar i Analyze-modus
+    // Ignore extra analyses in Analyze mode
     #[arg(
         short = 'i',
         long = "ignore-extra-analyses",
@@ -115,7 +115,7 @@ struct Cli {
     )]
     ignore_extra_analyses: bool,
 
-    // Fargekontroll
+    // Color control
     #[arg(
         short = 'c',
         long = "color",
@@ -137,7 +137,7 @@ struct Cli {
     )]
     verbose: bool,
 
-    // Filtrer retning
+    // Filter direction
     #[arg(
         short = 's',
         long = "surface",
@@ -154,7 +154,7 @@ struct Cli {
     )]
     lexical: bool,
 
-    // Filtrering av rapportlinjer
+    // Filtering of report lines
     #[arg(
         short = 'f',
         long = "hide-fails",
@@ -171,8 +171,8 @@ struct Cli {
     )]
     hide_passes: bool,
 
-    // -t/--test: tal (1..N), full tittel "Gruppe (Lexical/Generation|Surface/Analysis)" eller berre gruppenamnet.
-    // Spesial: 0 / null / liste listar alle testar og avsluttar.
+    // -t/--test: number (1..N), full title "Group (Lexical/Generation|Surface/Analysis)" or just the group name.
+    // Special: 0 / null / list lists all tests and exits.
     #[arg(
         short = 't',
         long = "test",
@@ -181,7 +181,7 @@ struct Cli {
     )]
     test: Option<String>,
 
-    // NYTT: rapportformat
+    // NEW: report format
     #[arg(
         short = 'o',
         long = "output",
@@ -230,7 +230,7 @@ fn group_of_case_name(name: &str) -> &str {
     }
 }
 
-// Bygg blokkliste (1-basert) i encounter-ordning over alle suites
+// Build block list (1-based) in encounter order across all suites
 #[derive(Clone)]
 struct BlockRef {
     suite_idx: usize,
@@ -256,17 +256,17 @@ async fn main() -> Result<()> {
 
     tracing_subscriber::fmt().with_env_filter(filter).init();
 
-    // Fargar: standard på, --no-color slår av
+    // Colors: default on, --no-color turns off
     if cli.no_color {
         set_color_override(false);
     } else {
         set_color_override(true);
     }
 
-    // Last suites frå teststiar
+    // Load suites from test paths
     let mut suites = load_specs(&cli.tests, cli.backend.into())?;
 
-    // Filtrér retning før vi bygger blokker
+    // Filter direction before we build blocks
     for swc in &mut suites {
         if cli.surface {
             swc.suite
@@ -296,7 +296,7 @@ async fn main() -> Result<()> {
         }
     }
 
-    // -t/--test: spesial 0/null/liste => list opp og avslutt
+    // -t/--test: special 0/null/list => list and exit
     if let Some(sel) = &cli.test {
         if blocks.is_empty() {
             error!("{}", t!("error-no-tests-after-filter"));
@@ -320,7 +320,7 @@ async fn main() -> Result<()> {
             }
             return Ok(());
         }
-        // Vel ut blokk(er) etter input: nummer, full tittel eller gruppenamn
+        // Select block(s) by input: number, full title or group name
         let mut selected: Vec<BlockRef> = Vec::new();
         if let Ok(n) = trimmed.parse::<usize>() {
             if n == 0 || n > blocks.len() {
@@ -375,7 +375,7 @@ async fn main() -> Result<()> {
                 std::process::exit(2);
             }
         }
-        // Filtrer suites til berre valde blokker
+        // Filter suites to only selected blocks
         for (si, swc) in suites.iter_mut().enumerate() {
             let allowed: Vec<(String, morph_test2::types::Direction)> = selected
                 .iter()
@@ -436,9 +436,9 @@ async fn process_suites_sequential(
     cli: &Cli,
     aggregate: &mut morph_test2::types::Summary,
 ) -> Result<()> {
-    // Køyr per suite
+    // Run per suite
     for swc in suites {
-        // Overstyr frå CLI
+        // Override from CLI
         let effective_gen = cli.generator.clone().unwrap_or_else(|| swc.gen_fst.clone());
         let effective_morph = if let Some(m) = &cli.analyser {
             Some(m.clone())

@@ -33,9 +33,7 @@ impl Localizer {
         let current_language = Self::detect_language();
         let messages = Self::load_messages(&current_language);
 
-        Self {
-            messages,
-        }
+        Self { messages }
     }
 
     fn detect_language() -> String {

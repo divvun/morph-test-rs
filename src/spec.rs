@@ -32,7 +32,7 @@ pub struct FomaCfg {
     pub app: Option<String>, // default: flookup
 }
 
-// Godtek alias for bakoverkompatibilitet
+// Accept alias for backward compatibility
 #[derive(Debug, Deserialize, Clone)]
 pub struct RawConfig {
     #[serde(alias = "Hfst")]
@@ -96,10 +96,10 @@ pub fn load_specs(paths: &[PathBuf], prefer: BackendChoice) -> Result<Vec<SuiteW
         let (backend, lookup_cmd, gen_fst, morph_fst) = resolve_backend(&raw, &prefer)
             .with_context(|| t_args!("spec-incomplete-config", "file" => f.display()))?;
         let mut cases: Vec<TestCase> = Vec::new();
-        // For kvar gruppe: bygg både generate-cases og inverter til analyze-cases
+        // For each group: build both generate-cases and invert to analyze-cases
         for (group, map) in &raw.tests {
             let group_name = group.trim();
-            // Akkumulator for analyze: surface -> set av analysar (lexical-nøkkel)
+            // Accumulator for analyze: surface -> set of analyses (lexical-key)
             let mut surface_to_analyses: IndexMap<String, BTreeSet<String>> = IndexMap::new();
             for (lexical, expected) in map {
                 let lexical_trim = lexical.trim().to_string();
@@ -115,16 +115,16 @@ pub fn load_specs(paths: &[PathBuf], prefer: BackendChoice) -> Result<Vec<SuiteW
                     input: lexical_trim.clone(),
                     expect: expect_vec.clone(),
                 });
-                // 2) Inverter til analyze: for kvar surface legg til lexical som analyse
+                // 2) Invert to analyze: for each surface add lexical as analysis
                 for surf in expect_vec {
                     let entry = surface_to_analyses.entry(surf).or_default();
                     entry.insert(lexical_trim.clone());
                 }
             }
-            // Lag Analyze-cases frå akkumulatoren
+            // Create Analyze-cases from the accumulator
             for (surface, analyses_set) in surface_to_analyses {
                 let mut analyses: Vec<String> = analyses_set.into_iter().collect();
-                // Stabil, deterministisk rekkjefølgje
+                // Stable, deterministic order
                 analyses.sort();
                 let name = format!("{group_name}: {surface}");
                 cases.push(TestCase {

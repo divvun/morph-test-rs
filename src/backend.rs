@@ -7,17 +7,17 @@ use std::time::Duration;
 use tracing::debug;
 use wait_timeout::ChildExt;
 
-/// 30 sekund per oppslag
+/// 30 seconds per lookup
 pub const DEFAULT_TIMEOUT: Duration = Duration::from_secs(30);
 
-/// Generisk backend som køyrer eit eksternt lookup-program (hfst-optimised-lookup, flookup, osb.)
+/// Generic backend that runs an external lookup program (hfst-optimised-lookup, flookup, etc.)
 #[derive(Debug, Clone)]
 pub struct ExternalBackend {
-    pub lookup_cmd: String, // "hfst-optimised-lookup" eller "flookup"
+    pub lookup_cmd: String, // "hfst-optimised-lookup" or "flookup"
     pub generator_fst: Option<String>,
     pub analyzer_fst: Option<String>,
     pub timeout: Option<Duration>,
-    pub quiet: bool, // demp stderr frå lookup når true
+    pub quiet: bool, // suppress stderr from lookup when true
 }
 
 pub trait Backend: Send + Sync {

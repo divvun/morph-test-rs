@@ -10,7 +10,7 @@ use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader, BufWriter};
 use tokio::process::{Child, ChildStdin, ChildStdout, Command};
 use tracing::debug;
 
-/// 30 sekund per oppslag
+/// 30 seconds per lookup
 pub const DEFAULT_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// A persistent FST process that can handle multiple queries
