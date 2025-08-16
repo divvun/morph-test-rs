@@ -1,4 +1,5 @@
 use crate::types::{Direction, TestCase, TestSuite};
+use crate::{t, t_args};
 use anyhow::{Context, Result, anyhow};
 use indexmap::IndexMap;
 use serde::Deserialize;
@@ -89,11 +90,11 @@ pub fn load_specs(paths: &[PathBuf], prefer: BackendChoice) -> Result<Vec<SuiteW
     let mut out = Vec::new();
     for f in files {
         let content = fs::read_to_string(&f)
-            .with_context(|| format!("Klarte ikkje å lesa: {}", f.display()))?;
+            .with_context(|| t_args!("spec-failed-to-read", "file" => f.display()))?;
         let raw: RawSpec = serde_yaml::from_str(&content)
-            .with_context(|| format!("YAML-feil i: {}", f.display()))?;
+            .with_context(|| t_args!("spec-yaml-error", "file" => f.display()))?;
         let (backend, lookup_cmd, gen_fst, morph_fst) = resolve_backend(&raw, &prefer)
-            .with_context(|| format!("Mangelfull eller utydeleg Config i {}", f.display()))?;
+            .with_context(|| t_args!("spec-incomplete-config", "file" => f.display()))?;
         let mut cases: Vec<TestCase> = Vec::new();
         // For kvar gruppe: bygg både generate-cases og inverter til analyze-cases
         for (group, map) in &raw.tests {
@@ -159,7 +160,7 @@ fn resolve_backend(
     let cfg = raw
         .config
         .as_ref()
-        .ok_or_else(|| anyhow!("Config manglar"))?;
+        .ok_or_else(|| anyhow!(t!("spec-missing-config")))?;
     let chosen = match prefer {
         BackendChoice::Hfst => BackendChoice::Hfst,
         BackendChoice::Foma => BackendChoice::Foma,
@@ -169,7 +170,7 @@ fn resolve_backend(
             } else if cfg.foma.as_ref().and_then(|x| x.r#gen.clone()).is_some() {
                 BackendChoice::Foma
             } else {
-                return Err(anyhow!("Fann verken HFST.Gen eller Foma.Gen i Config"));
+                return Err(anyhow!(t!("spec-missing-gen")));
             }
         }
     };
@@ -178,11 +179,11 @@ fn resolve_backend(
             let h = cfg
                 .hfst
                 .as_ref()
-                .ok_or_else(|| anyhow!("Config.hfst manglar"))?;
+                .ok_or_else(|| anyhow!(t!("spec-missing-hfst")))?;
             let gen_ = h
                 .r#gen
                 .clone()
-                .ok_or_else(|| anyhow!("Config.hfst.Gen manglar"))?;
+                .ok_or_else(|| anyhow!(t!("spec-missing-hfst-gen")))?;
             let gen_ = gen_.trim().to_string();
             let morph = h.morph.clone().map(|m| m.trim().to_string());
             let cmd = "hfst-optimised-lookup".to_string();
@@ -192,11 +193,11 @@ fn resolve_backend(
             let x = cfg
                 .foma
                 .as_ref()
-                .ok_or_else(|| anyhow!("Config.foma manglar"))?;
+                .ok_or_else(|| anyhow!(t!("spec-missing-foma")))?;
             let gen_ = x
                 .r#gen
                 .clone()
-                .ok_or_else(|| anyhow!("Config.foma.Gen manglar"))?;
+                .ok_or_else(|| anyhow!(t!("spec-missing-foma-gen")))?;
             let gen_ = gen_.trim().to_string();
             let morph = x.morph.clone().map(|m| m.trim().to_string());
             let cmd = x

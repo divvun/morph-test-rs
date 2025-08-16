@@ -5,9 +5,11 @@ use futures::future::try_join_all;
 use morph_test2::backend::{Backend, DEFAULT_TIMEOUT, ExternalBackend};
 use morph_test2::engine::run_suites;
 use morph_test2::engine_async::run_suites_async;
+use morph_test2::i18n;
 use morph_test2::pool::PooledBackend;
 use morph_test2::report::{OutputKind, print_human};
 use morph_test2::spec::{BackendChoice, load_specs};
+use morph_test2::{t, t_args};
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use tracing::{error, info};
@@ -215,10 +217,10 @@ fn resolve_lookup_path(cmd: &str) -> String {
     }
 }
 
-fn mode_label(dir: &morph_test2::types::Direction) -> &'static str {
+fn mode_label(dir: &morph_test2::types::Direction) -> String {
     match dir {
-        morph_test2::types::Direction::Generate => "Lexical/Generation",
-        morph_test2::types::Direction::Analyze => "Surface/Analysis",
+        morph_test2::types::Direction::Generate => t!("direction-generate"),
+        morph_test2::types::Direction::Analyze => t!("direction-analyze"),
     }
 }
 
@@ -239,6 +241,9 @@ struct BlockRef {
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    // Initialize localization first
+    i18n::init();
+
     let cli = Cli::parse();
 
     // Initialize tracing based on verbose flag and environment
@@ -295,7 +300,7 @@ async fn main() -> Result<()> {
     // -t/--test: spesial 0/null/liste => list opp og avslutt
     if let Some(sel) = &cli.test {
         if blocks.is_empty() {
-            error!("Ingen testar tilgjengeleg etter filtrering.");
+            error!("{}", t!("error-no-tests-after-filter"));
             std::process::exit(2);
         }
         let trimmed = sel.trim();
@@ -303,9 +308,16 @@ async fn main() -> Result<()> {
             || trimmed.eq_ignore_ascii_case("null")
             || trimmed.eq_ignore_ascii_case("liste")
         {
-            println!("Tilgjengelege testar (1-basert):");
+            println!("{}", t!("available-tests"));
             for (idx, b) in blocks.iter().enumerate() {
-                println!("  {}: {} ({})", idx + 1, b.group, mode_label(&b.dir));
+                println!(
+                    "{}",
+                    t_args!("test-list-item",
+                        "index" => (idx + 1),
+                        "group" => &b.group,
+                        "direction" => &mode_label(&b.dir)
+                    )
+                );
             }
             return Ok(());
         }
@@ -314,13 +326,22 @@ async fn main() -> Result<()> {
         if let Ok(n) = trimmed.parse::<usize>() {
             if n == 0 || n > blocks.len() {
                 error!(
-                    "Ugyldig testnummer {}. Gyldig område: 1..{}.",
-                    n,
-                    blocks.len()
+                    "{}",
+                    t_args!("error-invalid-test-number",
+                        "number" => n,
+                        "max" => blocks.len()
+                    )
                 );
-                eprintln!("Tilgjengelege testar (1-basert):");
+                eprintln!("{}", t!("available-tests"));
                 for (idx, b) in blocks.iter().enumerate() {
-                    eprintln!("  {}: {} ({})", idx + 1, b.group, mode_label(&b.dir));
+                    eprintln!(
+                        "{}",
+                        t_args!("test-list-item",
+                            "index" => (idx + 1),
+                            "group" => &b.group,
+                            "direction" => &mode_label(&b.dir)
+                        )
+                    );
                 }
                 std::process::exit(2);
             }
@@ -340,10 +361,17 @@ async fn main() -> Result<()> {
                 }
             }
             if selected.is_empty() {
-                error!("Fann ikkje test med ID/tittel: {trimmed}");
-                eprintln!("Tilgjengelege testar (1-basert):");
+                error!("{}", t_args!("error-test-not-found", "test" => trimmed));
+                eprintln!("{}", t!("available-tests"));
                 for (idx, b) in blocks.iter().enumerate() {
-                    eprintln!("  {}: {} ({})", idx + 1, b.group, mode_label(&b.dir));
+                    eprintln!(
+                        "{}",
+                        t_args!("test-list-item",
+                            "index" => (idx + 1),
+                            "group" => &b.group,
+                            "direction" => &mode_label(&b.dir)
+                        )
+                    );
                 }
                 std::process::exit(2);
             }
@@ -370,7 +398,13 @@ async fn main() -> Result<()> {
 
     let mut aggregate = morph_test2::types::Summary::default();
     if cli.verbose && !cli.silent {
-        info!("{} v{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
+        info!(
+            "{}",
+            t_args!("info-version",
+                "name" => env!("CARGO_PKG_NAME"),
+                "version" => env!("CARGO_PKG_VERSION")
+            )
+        );
     }
     if cli.use_serial {
         // Use traditional sequential processing
@@ -382,8 +416,12 @@ async fn main() -> Result<()> {
 
     if cli.verbose && !cli.silent {
         info!(
-            "Alle testkøyringar ferdige. Total: {}, Passed: {}, Failed: {}",
-            aggregate.total, aggregate.passed, aggregate.failed
+            "{}",
+            t_args!("info-all-finished",
+                "total" => aggregate.total,
+                "passed" => aggregate.passed,
+                "failed" => aggregate.failed
+            )
         );
     }
 
@@ -423,20 +461,22 @@ async fn process_suites_sequential(
                 .map(display_path)
                 .unwrap_or_else(|| "-".to_string());
             let mode_txt = if cli.surface {
-                "Analyze-only"
+                t!("mode-analyze-only")
             } else if cli.lexical {
-                "Generate-only"
+                t!("mode-generate-only")
             } else {
-                "All"
+                t!("mode-all")
             };
-            info!("Suite         : {}", swc.suite.name);
-            info!("Lookup tool   : {lookup_full}");
-            info!("Generator     : {gen_full}");
-            info!("Analyzer      : {morph_full}");
+            info!("{}", t_args!("info-suite", "name" => &swc.suite.name));
+            info!("{}", t_args!("info-lookup-tool", "path" => &lookup_full));
+            info!("{}", t_args!("info-generator", "path" => &gen_full));
+            info!("{}", t_args!("info-analyzer", "path" => &morph_full));
             info!(
-                "Startar testing ({} testar, modus: {}) (batch processing)...",
-                swc.suite.cases.len(),
-                mode_txt
+                "{}",
+                t_args!("info-starting-tests",
+                    "count" => swc.suite.cases.len(),
+                    "mode" => &mode_txt
+                )
             );
         }
 
@@ -450,7 +490,7 @@ async fn process_suites_sequential(
 
         // Validate backend before running tests - fail fast on configuration errors
         if let Err(e) = backend.validate() {
-            error!("Feil: {e}");
+            error!("{}", t_args!("error-validation-failed", "error" => e));
             std::process::exit(2);
         }
 
@@ -458,8 +498,11 @@ async fn process_suites_sequential(
 
         if cli.verbose && !cli.silent {
             info!(
-                "Ferdig: passed {}, failed {}. Skriv rapport...",
-                summary.passed, summary.failed
+                "{}",
+                t_args!("info-finished",
+                    "passed" => summary.passed,
+                    "failed" => summary.failed
+                )
             );
         }
 
@@ -548,7 +591,10 @@ async fn process_suites_with_pool(
                 let mut group_summaries = Vec::new();
                 for swc in group_suites {
                     if cli.verbose && !cli.silent {
-                        info!("Suite: {} (parallel processing)...", swc.suite.name);
+                        info!(
+                            "{}",
+                            t_args!("info-starting-parallel", "name" => &swc.suite.name)
+                        );
                     }
 
                     let summary =
@@ -557,8 +603,11 @@ async fn process_suites_with_pool(
 
                     if cli.verbose && !cli.silent {
                         info!(
-                            "Ferdig: passed {}, failed {}. Skriv rapport...",
-                            summary.passed, summary.failed
+                            "{}",
+                            t_args!("info-finished",
+                                "passed" => summary.passed,
+                                "failed" => summary.failed
+                            )
                         );
                     }
 

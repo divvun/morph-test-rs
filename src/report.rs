@@ -1,4 +1,5 @@
 use crate::types::{CaseResult, Direction, Summary};
+use crate::{t, t_args};
 use colored::Colorize;
 use indexmap::IndexMap;
 use std::collections::BTreeSet;
@@ -18,10 +19,10 @@ fn parse_group(name: &str) -> (&str, &str) {
     }
 }
 
-fn mode_label(dir: &Direction) -> &'static str {
+fn mode_label(dir: &Direction) -> String {
     match dir {
-        Direction::Generate => "Lexical/Generation",
-        Direction::Analyze => "Surface/Analysis",
+        Direction::Generate => t!("direction-generate"),
+        Direction::Analyze => t!("direction-analyze"),
     }
 }
 
@@ -42,15 +43,19 @@ fn print_failure_detailed(case: &CaseResult, i: usize, n_cases: usize, expected_
     );
 
     if let Some(error) = &case.error {
-        println!("         Error: {}", error.red());
+        println!("         {}: {}", t!("report-error"), error.red());
     } else {
         let actual_str = if case.actual.is_empty() {
             "<none>".dimmed().to_string()
         } else {
             case.actual.join(", ")
         };
-        println!("         Expected: {}", expected_item.green());
-        println!("         Got:      {}", actual_str.yellow());
+        println!(
+            "         {}: {}",
+            t!("report-expected"),
+            expected_item.green()
+        );
+        println!("         {}: {}", t!("report-got"), actual_str.yellow());
     }
 }
 
@@ -96,7 +101,7 @@ fn print_human_normal(
 ) {
     let (seq, groups) = build_blocks(&summary.cases);
     // For kvar blokk (gruppe+retning)
-    let mut test_idx = 0usize; // 0-basert nummerering (som Python)
+    let mut test_idx = 1usize; // 1-basert nummerering
     for key in seq {
         let cases = match groups.get(&key) {
             Some(v) => v,
@@ -106,7 +111,11 @@ fn print_human_normal(
             continue;
         }
         // Tittel-linje
-        let title = format!("Test {}: {} ({})", test_idx, key.0, mode_label(&key.1));
+        let title = t_args!("report-test-header",
+            "index" => test_idx,
+            "group" => &key.0,
+            "direction" => &mode_label(&key.1)
+        );
         let line = dash_line(title.len());
         println!("{line}");
         println!("{title}");
@@ -122,8 +131,8 @@ fn print_human_normal(
             // Når expected er tom, lag ei placeholder-linje
             if case.expected.is_empty() {
                 let placeholder = match case.direction {
-                    Direction::Generate => "<No lexical/generation>",
-                    Direction::Analyze => "<No surface/analysis>",
+                    Direction::Generate => t!("report-no-lexical"),
+                    Direction::Analyze => t!("report-no-surface"),
                 };
                 let is_pass = is_pass_empty_expected(case, ignore_extra_analyses);
                 let _status_str = if is_pass {
@@ -145,7 +154,7 @@ fn print_human_normal(
                             width = width
                         );
                     } else {
-                        print_failure_detailed(case, i, n_cases, placeholder);
+                        print_failure_detailed(case, i, n_cases, &placeholder);
                     }
                 }
                 total_checks += 1;
@@ -182,7 +191,7 @@ fn print_human_normal(
                             case,
                             i,
                             n_cases,
-                            &format!("Unexpected results: {}", extras_str),
+                            &t_args!("report-unexpected-results", "results" => &extras_str),
                         );
                         total_checks += 1;
                         fails += 1;
@@ -244,7 +253,7 @@ fn print_human_normal(
                         case,
                         i,
                         n_cases,
-                        &format!("Unexpected results: {}", extras_str),
+                        &t_args!("report-unexpected-results", "results" => &extras_str),
                     );
                     total_checks += 1;
                     fails += 1;
@@ -252,7 +261,15 @@ fn print_human_normal(
             }
         }
         println!();
-        println!("Test {test_idx} - Passes: {passes}, Fails: {fails}, Total: {total_checks}");
+        println!(
+            "{}",
+            t_args!("report-test-summary",
+                "index" => test_idx,
+                "passes" => passes,
+                "fails" => fails,
+                "total" => total_checks
+            )
+        );
         println!();
         test_idx += 1;
     }
@@ -261,7 +278,14 @@ fn print_human_normal(
     let all_cases: Vec<&CaseResult> = summary.cases.iter().collect();
     let (total_passes, total_fails, total_checks) =
         calculate_counts(&all_cases, ignore_extra_analyses);
-    println!("Total passes: {total_passes}, Total fails: {total_fails}, Total: {total_checks}");
+    println!(
+        "{}",
+        t_args!("report-total-summary",
+            "passes" => total_passes,
+            "fails" => total_fails,
+            "total" => total_checks
+        )
+    );
 }
 
 // Nytt: compact-format
@@ -270,7 +294,7 @@ fn print_human_compact(summary: &Summary, ignore_extra_analyses: bool) {
     let mut total_passes = 0usize;
     let mut total_fails = 0usize;
     let mut total_checks = 0usize;
-    let mut test_idx = 0usize; // 0-basert (som Python)
+    let mut test_idx = 1usize; // 1-basert
     for key in seq {
         let cases = match groups.get(&key) {
             Some(v) => v,
@@ -288,21 +312,35 @@ fn print_human_compact(summary: &Summary, ignore_extra_analyses: bool) {
             "[FAIL]".red().bold().to_string()
         };
         println!(
-            "{} Test {}: {} ({}) {}/{}/{}",
+            "{} {}",
             status,
-            test_idx,
-            key.0,
-            mode_label(&key.1),
-            passes,
-            fails,
-            checks
+            t_args!("report-test-header",
+                "index" => test_idx,
+                "group" => &key.0,
+                "direction" => &mode_label(&key.1)
+            )
+        );
+        println!(
+            "{}",
+            t_args!("report-final-counts",
+                "passes" => passes,
+                "fails" => fails,
+                "total" => checks
+            )
         );
         total_passes += passes;
         total_fails += fails;
         total_checks += checks;
         test_idx += 1;
     }
-    println!("Total passes: {total_passes}, Total fails: {total_fails}, Total: {total_checks}");
+    println!(
+        "{}",
+        t_args!("report-total-summary",
+            "passes" => total_passes,
+            "fails" => total_fails,
+            "total" => total_checks
+        )
+    );
 }
 
 // Nytt: terse-format (prikker/utrop for kvar sjekk, éi line per testblokk, og PASS/FAIL til slutt)
@@ -339,7 +377,14 @@ fn print_human_terse(summary: &Summary, ignore_extra_analyses: bool) {
         }
         println!("{line}");
     }
-    println!("{}", if any_fail { "FAIL" } else { "PASS" });
+    println!(
+        "{}",
+        if any_fail {
+            t!("report-fail")
+        } else {
+            t!("report-pass")
+        }
+    );
 }
 
 // Nytt: final-format (berre totalsamandrag P/F/T)
@@ -348,7 +393,14 @@ fn print_human_final(summary: &Summary, ignore_extra_analyses: bool) {
     let all_cases: Vec<&CaseResult> = summary.cases.iter().collect();
     let (total_passes, total_fails, total_checks) =
         calculate_counts(&all_cases, ignore_extra_analyses);
-    println!("{total_passes}/{total_fails}/{total_checks}");
+    println!(
+        "{}",
+        t_args!("report-final-counts",
+            "passes" => total_passes,
+            "fails" => total_fails,
+            "total" => total_checks
+        )
+    );
 }
 
 fn is_pass_empty_expected(case: &CaseResult, ignore_extra_analyses: bool) -> bool {

@@ -1,7 +1,9 @@
+use crate::{t, t_args};
 use anyhow::{Context, Result, anyhow};
 use deadpool::managed::{Manager, Metrics, Pool, RecycleError, RecycleResult};
 use futures::future::try_join_all;
 use indexmap::IndexMap;
+use std::borrow::Cow;
 use std::process::Stdio;
 use std::time::Duration;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader, BufWriter};
@@ -21,7 +23,7 @@ pub struct FstProcess {
 impl FstProcess {
     /// Send a batch of inputs and read results
     pub async fn process_batch(&mut self, inputs: &[String]) -> Result<Vec<Vec<String>>> {
-        debug!("Pool process batch: processing {} inputs", inputs.len());
+        debug!("{}", t_args!("debug-pool-batch", "count" => inputs.len()));
         // Send all inputs
         for input in inputs {
             let input_trimmed = input.trim();
@@ -80,7 +82,7 @@ impl FstProcess {
                         }
                     }
                 }
-                Ok(Err(e)) => return Err(anyhow!("IO error reading from process: {}", e)),
+                Ok(Err(e)) => return Err(anyhow!(t_args!("pool-io-error", "error" => &e))),
                 Err(_) => {
                     // Timeout is expected when no more output is available
                     break;
@@ -97,9 +99,11 @@ impl FstProcess {
         }
 
         debug!(
-            "Pool batch completed: {} inputs processed, {} total results",
-            inputs.len(),
-            all_results.iter().map(|r| r.len()).sum::<usize>()
+            "{}",
+            t_args!("debug-pool-completed",
+                "inputs" => inputs.len(),
+                "results" => all_results.iter().map(|r| r.len()).sum::<usize>()
+            )
         );
         Ok(all_results)
     }
@@ -129,13 +133,16 @@ impl Manager for FstProcessManager {
 
         let mut child = cmd
             .spawn()
-            .with_context(|| format!("Klarte ikkje å starta '{}'", self.lookup_cmd))?;
+            .with_context(|| t_args!("backend-failed-to-start", "cmd" => &self.lookup_cmd))?;
 
-        let stdin = child.stdin.take().ok_or_else(|| anyhow!("Manglar stdin"))?;
+        let stdin = child
+            .stdin
+            .take()
+            .ok_or_else(|| anyhow!(t!("pool-missing-stdin")))?;
         let stdout = child
             .stdout
             .take()
-            .ok_or_else(|| anyhow!("Manglar stdout"))?;
+            .ok_or_else(|| anyhow!(t!("pool-missing-stdout")))?;
 
         Ok(FstProcess {
             child,
@@ -151,9 +158,11 @@ impl Manager for FstProcessManager {
     ) -> RecycleResult<Self::Error> {
         // Check if the child process is still alive
         match obj.child.try_wait() {
-            Ok(Some(_)) => Err(RecycleError::message("Process has exited")),
+            Ok(Some(_)) => Err(RecycleError::Message(Cow::Owned(t!("pool-process-exited")))),
             Ok(None) => Ok(()), // Still running
-            Err(_e) => Err(RecycleError::message("Error checking process status")),
+            Err(_e) => Err(RecycleError::Message(Cow::Owned(t!(
+                "pool-process-status-error"
+            )))),
         }
     }
 }
@@ -189,7 +198,7 @@ impl PooledBackend {
                 Pool::builder(manager)
                     .max_size(pool_size)
                     .build()
-                    .context("Failed to create analyze pool")?,
+                    .context(t!("pool-create-analyze-failed"))?,
             )
         } else {
             None
@@ -205,7 +214,7 @@ impl PooledBackend {
                 Pool::builder(manager)
                     .max_size(pool_size)
                     .build()
-                    .context("Failed to create generate pool")?,
+                    .context(t!("pool-create-generate-failed"))?,
             )
         } else {
             None
@@ -221,7 +230,7 @@ impl PooledBackend {
         let pool = self
             .analyze_pool
             .as_ref()
-            .ok_or_else(|| anyhow!("Analyzer-FST ikkje sett"))?;
+            .ok_or_else(|| anyhow!(t!("backend-analyzer-not-set")))?;
 
         if inputs.is_empty() {
             return Ok(vec![]);
@@ -239,7 +248,7 @@ impl PooledBackend {
                 let mut process = pool
                     .get()
                     .await
-                    .map_err(|e| anyhow!("Failed to get process from analyze pool: {:?}", e))?;
+                    .map_err(|e| anyhow!(t_args!("pool-get-analyze-failed", "error" => &e)))?;
                 process.process_batch(chunk).await
             }
         });
@@ -254,7 +263,7 @@ impl PooledBackend {
         let pool = self
             .generate_pool
             .as_ref()
-            .ok_or_else(|| anyhow!("Generator-FST ikkje sett"))?;
+            .ok_or_else(|| anyhow!(t!("backend-generator-not-set")))?;
 
         if inputs.is_empty() {
             return Ok(vec![]);
@@ -272,7 +281,7 @@ impl PooledBackend {
                 let mut process = pool
                     .get()
                     .await
-                    .map_err(|e| anyhow!("Failed to get process from generate pool: {:?}", e))?;
+                    .map_err(|e| anyhow!(t_args!("pool-get-generate-failed", "error" => &e)))?;
                 process.process_batch(chunk).await
             }
         });
@@ -286,22 +295,18 @@ impl PooledBackend {
     pub async fn validate(&self) -> Result<()> {
         // Test that we can spawn and use a process from each pool
         if let Some(pool) = &self.analyze_pool {
-            let _process = pool.get().await.map_err(|e| {
-                anyhow!(
-                    "Failed to get process from analyze pool for validation: {:?}",
-                    e
-                )
-            })?;
+            let _process = pool
+                .get()
+                .await
+                .map_err(|e| anyhow!(t_args!("pool-validate-analyze-failed", "error" => &e)))?;
             // The process creation in the manager already validates the command exists
         }
 
         if let Some(pool) = &self.generate_pool {
-            let _process = pool.get().await.map_err(|e| {
-                anyhow!(
-                    "Failed to get process from generate pool for validation: {:?}",
-                    e
-                )
-            })?;
+            let _process = pool
+                .get()
+                .await
+                .map_err(|e| anyhow!(t_args!("pool-validate-generate-failed", "error" => &e)))?;
             // The process creation in the manager already validates the command exists
         }
 

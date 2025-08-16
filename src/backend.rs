@@ -1,3 +1,4 @@
+use crate::{t, t_args};
 use anyhow::{Context, Result, anyhow};
 use indexmap::IndexMap;
 use std::io::Write;
@@ -29,9 +30,11 @@ impl ExternalBackend {
     fn run_lookup_batch(&self, fst: &str, inputs: &[String]) -> Result<Vec<Vec<String>>> {
         let timeout = self.timeout.unwrap_or(DEFAULT_TIMEOUT);
         debug!(
-            "Running batch lookup with {} inputs using FST: {}",
-            inputs.len(),
-            fst
+            "{}",
+            t_args!("debug-batch-lookup",
+                "count" => inputs.len(),
+                "fst" => fst
+            )
         );
 
         let mut cmd = Command::new(&self.lookup_cmd);
@@ -46,14 +49,14 @@ impl ExternalBackend {
 
         let mut child = cmd
             .spawn()
-            .with_context(|| format!("Klarte ikkje å starta '{}'", self.lookup_cmd))?;
+            .with_context(|| t_args!("backend-failed-to-start", "cmd" => &self.lookup_cmd))?;
 
         // Send all inputs at once
         {
             let stdin = child
                 .stdin
                 .as_mut()
-                .ok_or_else(|| anyhow!("Manglar stdin"))?;
+                .ok_or_else(|| anyhow!(t!("backend-missing-stdin")))?;
 
             for input in inputs {
                 let input_trimmed = input.trim();
@@ -67,24 +70,27 @@ impl ExternalBackend {
         match child.wait_timeout(timeout)? {
             Some(status) => {
                 if !status.success() {
-                    return Err(anyhow!("Lookup-prosess feila med status {}", status));
+                    return Err(anyhow!(
+                        t_args!("backend-process-failed", "status" => status)
+                    ));
                 }
             }
             None => {
                 let _ = child.kill();
                 let _ = child.wait();
-                return Err(anyhow!("Lookup tidsavbrot etter {} s", timeout.as_secs()));
+                return Err(anyhow!(
+                    t_args!("backend-timeout", "seconds" => timeout.as_secs())
+                ));
             }
         }
 
         let out = child.wait_with_output()?;
         if !out.status.success() {
             let stderr = String::from_utf8_lossy(&out.stderr);
-            return Err(anyhow!(
-                "Lookup-prosess feila med status {}\nStderr: {}",
-                out.status,
-                stderr
-            ));
+            return Err(anyhow!(t_args!("backend-process-failed-stderr",
+                "status" => out.status,
+                "stderr" => stderr.as_ref()
+            )));
         }
 
         // Parse batch output - FST tools output: input\toutput format
@@ -133,9 +139,11 @@ impl ExternalBackend {
         }
 
         debug!(
-            "Batch lookup completed: {} inputs processed, {} total results",
-            inputs.len(),
-            all_results.iter().map(|r| r.len()).sum::<usize>()
+            "{}",
+            t_args!("debug-batch-completed",
+                "inputs" => inputs.len(),
+                "results" => all_results.iter().map(|r| r.len()).sum::<usize>()
+            )
         );
         Ok(all_results)
     }
@@ -146,7 +154,7 @@ impl Backend for ExternalBackend {
         let fst = self
             .analyzer_fst
             .as_ref()
-            .ok_or_else(|| anyhow!("Analyzer-FST ikkje sett"))?;
+            .ok_or_else(|| anyhow!(t!("backend-analyzer-not-set")))?;
         self.run_lookup_batch(fst, inputs)
     }
 
@@ -154,7 +162,7 @@ impl Backend for ExternalBackend {
         let fst = self
             .generator_fst
             .as_ref()
-            .ok_or_else(|| anyhow!("Generator-FST ikkje sett"))?;
+            .ok_or_else(|| anyhow!(t!("backend-generator-not-set")))?;
         self.run_lookup_batch(fst, inputs)
     }
 
@@ -174,25 +182,22 @@ impl Backend for ExternalBackend {
                         // Command exists and ran, don't care about exit code for --help
                         Ok(())
                     }
-                    Err(e) => Err(anyhow!(
-                        "Lookup-kommando '{}' kunne ikkje køyrast: {}",
-                        self.lookup_cmd,
-                        e
-                    )),
+                    Err(e) => Err(anyhow!(t_args!("backend-command-not-executable",
+                        "cmd" => &self.lookup_cmd,
+                        "error" => &e
+                    ))),
                 }
             }
             Err(e) => {
                 if e.kind() == std::io::ErrorKind::NotFound {
                     Err(anyhow!(
-                        "Lookup-kommando '{}' finst ikkje eller kan ikkje køyrast. Sjekk at den er installert og i PATH.",
-                        self.lookup_cmd
+                        t_args!("backend-command-not-found", "cmd" => &self.lookup_cmd)
                     ))
                 } else {
-                    Err(anyhow!(
-                        "Kan ikkje køyre lookup-kommando '{}': {}",
-                        self.lookup_cmd,
-                        e
-                    ))
+                    Err(anyhow!(t_args!("backend-command-error",
+                        "cmd" => &self.lookup_cmd,
+                        "error" => &e
+                    )))
                 }
             }
         }
