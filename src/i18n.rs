@@ -37,43 +37,15 @@ impl Localizer {
     }
 
     fn detect_language() -> String {
-        // Check environment variables in order of preference
-        let lang_vars = ["LC_ALL", "LC_MESSAGES", "LANG"];
-
-        for var in &lang_vars {
-            if let Ok(value) = std::env::var(var) {
-                // Parse locale (e.g., "nn_NO.UTF-8" -> "nn")
-                let lang_code = value
-                    .split('_')
-                    .next()
-                    .unwrap_or(&value)
-                    .split('.')
-                    .next()
-                    .unwrap_or(&value)
-                    .to_lowercase();
-
-                match lang_code.as_str() {
-                    "nn" | "nno" => return "nn".to_string(),
-                    "nb" | "no" | "nor" => return "nb".to_string(),
-                    "en" => return "en".to_string(),
-                    _ => continue,
-                }
-            }
-        }
-
-        // Default to English
-        "en".to_string()
+        // Always use nn-Runr locale (Norwegian Nynorsk written with runes)
+        "nn-Runr".to_string()
     }
 
     fn load_messages(language: &str) -> HashMap<String, String> {
         let mut messages = HashMap::new();
 
-        // Load the appropriate language file content
-        let content = match language {
-            "nn" => include_str!("../locales/nn.ftl"),
-            "nb" => include_str!("../locales/nb.ftl"),
-            _ => include_str!("../locales/en.ftl"), // Default to English
-        };
+        // Always load the nn-Runr locale file
+        let content = include_str!("../locales/nn-Runr.ftl");
 
         // Parse simple key = value format
         for line in content.lines() {
