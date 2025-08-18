@@ -282,6 +282,7 @@ fn create_custom_help() -> String {
     let mut help_text = help.to_string();
     
     // Replace section headers with localized versions
+    help_text = help_text.replace("Usage:", &t!("cli-error-usage"));
     help_text = help_text.replace("Arguments:", &t!("cli-help-arguments"));
     help_text = help_text.replace("Options:", &t!("cli-help-options"));
     help_text = help_text.replace("[default:", &format!("[{}:", t!("cli-help-default")));
@@ -290,7 +291,39 @@ fn create_custom_help() -> String {
     help_text = help_text.replace("Print help", &t!("cli-help-print-help"));
     help_text = help_text.replace("Print version", &t!("cli-help-print-version"));
     
-    help_text
+    // Clean up excessive blank lines and lines before [standard::, [alias::, and [moglege verdiar:: 
+    let lines: Vec<&str> = help_text.lines().collect();
+    let mut cleaned_lines = Vec::new();
+    let mut prev_was_empty = false;
+    
+    for (i, line) in lines.iter().enumerate() {
+        let is_empty = line.trim().is_empty();
+        
+        // Skip empty line if it's before a [standard::, [alias::, or [moglege verdiar:: line
+        if is_empty && i + 1 < lines.len() {
+            let next_line = lines[i + 1].trim();
+            if next_line.starts_with("[standard::") 
+                || next_line.starts_with("[alias::") 
+                || next_line.starts_with("[moglege verdiar::")
+                || next_line.starts_with("[mulige verdier::")
+                || next_line.starts_with("[possible values::")
+                || next_line.starts_with(&format!("[{}:", t!("cli-help-default")))
+                || next_line.starts_with(&format!("[{}:", t!("cli-help-aliases")))
+                || next_line.starts_with(&format!("[{}:", t!("cli-help-possible-values"))) {
+                continue;
+            }
+        }
+        
+        if is_empty && prev_was_empty {
+            // Skip consecutive empty lines
+            continue;
+        }
+        
+        cleaned_lines.push(*line);
+        prev_was_empty = is_empty;
+    }
+    
+    cleaned_lines.join("\n")
 }
 
 /// Print custom localized version information
