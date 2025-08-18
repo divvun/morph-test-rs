@@ -3,6 +3,7 @@ use std::fs;
 use std::path::Path;
 use std::sync::{Mutex, OnceLock};
 use unic_locale::LanguageIdentifier;
+use isolang::Language;
 
 /// Global localization state
 static LOCALIZER: OnceLock<Mutex<Localizer>> = OnceLock::new();
@@ -147,13 +148,24 @@ impl Localizer {
         preferences
     }
 
-    /// Normalize three-letter language codes to their two-letter equivalents
+    /// Normalize language codes using ISO 639 standards
+    /// Converts three-letter codes to two-letter equivalents when available
     fn normalize_language_code(&self, lang_code: &str) -> String {
-        match lang_code {
-            "nno" => "nn".to_string(),
-            "nor" => "nb".to_string(), // Norwegian Bokmål is the default for "nor"
-            _ => lang_code.to_string(),
+        // Try to parse the language code using isolang
+        if Language::from_639_1(lang_code).is_some() {
+            // It's already a two-letter code, return as-is
+            return lang_code.to_string();
         }
+        
+        if let Some(language) = Language::from_639_3(lang_code) {
+            // It's a three-letter code, convert to two-letter if available
+            if let Some(two_letter) = language.to_639_1() {
+                return two_letter.to_string();
+            }
+        }
+        
+        // If we can't normalize it, return the original code
+        lang_code.to_string()
     }
 
     /// Find the best matching locale with graceful fallbacks
@@ -406,5 +418,28 @@ mod tests {
             let result = locale_str.parse::<LanguageIdentifier>();
             assert_eq!(result.is_ok(), should_parse, "Failed parsing: {}", locale_str);
         }
+    }
+
+    #[test]
+    fn test_iso639_normalization() {
+        let localizer = Localizer {
+            messages: HashMap::new(),
+            current_locale: "en".parse().unwrap(),
+            available_locales: Vec::new(),
+        };
+
+        // Test ISO 639 three-letter to two-letter normalization
+        assert_eq!(localizer.normalize_language_code("nno"), "nn");
+        assert_eq!(localizer.normalize_language_code("nor"), "no");
+        assert_eq!(localizer.normalize_language_code("deu"), "de");
+        assert_eq!(localizer.normalize_language_code("fra"), "fr");
+        
+        // Test that two-letter codes are returned as-is
+        assert_eq!(localizer.normalize_language_code("en"), "en");
+        assert_eq!(localizer.normalize_language_code("nn"), "nn");
+        assert_eq!(localizer.normalize_language_code("de"), "de");
+        
+        // Test unknown codes
+        assert_eq!(localizer.normalize_language_code("xyz"), "xyz");
     }
 }
