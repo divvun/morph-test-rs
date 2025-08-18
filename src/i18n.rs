@@ -42,14 +42,25 @@ impl Localizer {
 
         for var in &lang_vars {
             if let Ok(value) = std::env::var(var) {
-                // Parse locale (e.g., "nn_NO.UTF-8" -> "nn")
-                let lang_code = value
-                    .split('_')
+                // Handle full locale strings first (e.g., "nn-Runr", "nn_Runr", "nn-Runr_NO")
+                let locale_without_encoding = value.split('.').next().unwrap_or(&value);
+                let locale_parts: Vec<&str> = locale_without_encoding.split('_').collect();
+                
+                // Check for nn-Runr variants
+                if let Some(lang_script) = locale_parts.first() {
+                    match lang_script.to_lowercase().as_str() {
+                        "nn-runr" => return "nn-Runr".to_string(),
+                        _ => {}
+                    }
+                }
+
+                // Parse standard locale format (e.g., "nn_NO.UTF-8" -> "nn")
+                let lang_code = locale_parts
+                    .first()
+                    .unwrap_or(&locale_without_encoding)
+                    .split('-')
                     .next()
-                    .unwrap_or(&value)
-                    .split('.')
-                    .next()
-                    .unwrap_or(&value)
+                    .unwrap_or(locale_without_encoding)
                     .to_lowercase();
 
                 match lang_code.as_str() {
@@ -71,6 +82,7 @@ impl Localizer {
         // Load the appropriate language file content
         let content = match language {
             "nn" => include_str!("../locales/nn.ftl"),
+            "nn-Runr" => include_str!("../locales/nn-Runr.ftl"),
             "nb" => include_str!("../locales/nb.ftl"),
             _ => include_str!("../locales/en.ftl"), // Default to English
         };
