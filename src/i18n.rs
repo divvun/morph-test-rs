@@ -147,6 +147,15 @@ impl Localizer {
         preferences
     }
 
+    /// Normalize three-letter language codes to their two-letter equivalents
+    fn normalize_language_code(&self, lang_code: &str) -> String {
+        match lang_code {
+            "nno" => "nn".to_string(),
+            "nor" => "nb".to_string(), // Norwegian Bokmål is the default for "nor"
+            _ => lang_code.to_string(),
+        }
+    }
+
     /// Find the best matching locale with graceful fallbacks
     fn find_best_match(&self, requested: &LanguageIdentifier) -> Option<LanguageIdentifier> {
         // Try exact match first
@@ -180,6 +189,43 @@ impl Localizer {
                 &[],
             );
             fallback_chain.push(without_region);
+        }
+        
+        // Try normalized language code with same script/region
+        let normalized_lang = self.normalize_language_code(&requested.language.to_string());
+        if normalized_lang != requested.language.to_string() {
+            // Try normalized language with script and region
+            if let Ok(norm_lang) = normalized_lang.parse() {
+                if requested.script.is_some() || requested.region.is_some() {
+                    let normalized_full = LanguageIdentifier::from_parts(
+                        norm_lang,
+                        requested.script,
+                        requested.region,
+                        &[],
+                    );
+                    fallback_chain.push(normalized_full);
+                }
+                
+                // Try normalized language with script only (no region)
+                if requested.script.is_some() {
+                    let normalized_script = LanguageIdentifier::from_parts(
+                        norm_lang,
+                        requested.script,
+                        None,
+                        &[],
+                    );
+                    fallback_chain.push(normalized_script);
+                }
+                
+                // Try normalized language only
+                let normalized_lang_only = LanguageIdentifier::from_parts(
+                    norm_lang,
+                    None,
+                    None,
+                    &[],
+                );
+                fallback_chain.push(normalized_lang_only);
+            }
         }
         
         // Try just language if script was present
@@ -333,6 +379,16 @@ mod tests {
         let script_only: LanguageIdentifier = "nn-Latn".parse().unwrap();
         let expected_lang: LanguageIdentifier = "nn".parse().unwrap();
         assert_eq!(localizer.find_best_match(&script_only), Some(expected_lang));
+
+        // Test three-letter language code normalization with script
+        let nno_runr: LanguageIdentifier = "nno-Runr".parse().unwrap();
+        let expected_nn_runr: LanguageIdentifier = "nn-Runr".parse().unwrap();
+        assert_eq!(localizer.find_best_match(&nno_runr), Some(expected_nn_runr));
+
+        // Test three-letter language code normalization without script
+        let nno_only: LanguageIdentifier = "nno".parse().unwrap();
+        let expected_nn: LanguageIdentifier = "nn".parse().unwrap();
+        assert_eq!(localizer.find_best_match(&nno_only), Some(expected_nn));
     }
 
     #[test]
