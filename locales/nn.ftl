@@ -5,17 +5,17 @@ cli-generator = Overstyr generator-FST (.hfstol for HFST, .foma for Foma) [alias
 cli-analyser = Overstyr analyse-FST (.hfstol for HFST, .foma for Foma) [alias: --morph, --analyzer]
 cli-silent = Stille modus: inga utskrift, og demp stderr frå lookup
 cli-lookup-tool = Overstyr lookup-kommando (t.d. hfst-optimised-lookup, flookup) [alias: --app]
-cli-ignore-extra = Analysetestar: godkjenn når alle forventa analysar finst, sjølv om det finst ekstra analysar
-cli-color = Tving fargar på (standard er fargar på)
+cli-ignore-extra = For analysetestar: godkjenn når alle forventa analysar finst, sjølv om det finst ekstra analysar
+cli-color = Tving fargar på (standard)
 cli-no-color = Slå av fargar i rapporten (overstyrer --color)
-cli-verbose = Vis metadata (lookup med full sti, generator/analyzer med fulle stiar, versjon) og framdriftsmeldingar. Viser òg 'EXTRA' for Analyze-PASS når -i er aktiv.
-cli-surface = Køyr berre analysetestar (surface form → analyses)
-cli-lexical = Køyr berre genereringstestar (lexical tags → surface forms)
-cli-hide-fails = Skjul feil (FAIL), vis berre gjennomgåtte (PASS)
-cli-hide-passes = Skjul gjennomgåtte (PASS), vis berre feil (FAIL)
-cli-test = Køyr berre angitt test: nummer 1..N, tittel „Gruppe (Lexical/Generation|Surface/Analysis)" eller berre gruppenamnet frå YAML. Spesial: 0, 'null' eller 'liste' listar alle tilgjengelege testar og avsluttar.
-cli-output = Rapportformat: compact | terse | final | normal (standard: normal)
-cli-serial = Bruk seriell køyring i staden for parallell processing (standardverdi er parallell)
+cli-verbose = Vis metadata (lookup med full sti, generator/analyzer med fulle stiar, versjon) og framdriftsmeldingar. Viser òg 'EXTRA'-analyser for analyse-PASS når -i er aktiv.
+cli-surface = Køyr berre analysetestar (overflateform → analyse)
+cli-lexical = Køyr berre genereringstestar (analyse → overflateform)
+cli-hide-fails = Skjul feil (FAIL), vis berre godkjende (PASS)
+cli-hide-passes = Skjul godkjende (PASS), vis berre feil (FAIL)
+cli-test = Køyr berre oppgjeven test: nummer 1..N, tittel „Gruppe (Lexical/Generation|Surface/Analysis)" eller berre gruppenamnet frå YAML. Spesialtestnamn: 0, 'null' eller 'liste' listar alle tilgjengelege testsett.
+cli-output = Rapportformat: normal | compact | terse | final (standard: normal)
+cli-serial = Bruk seriell køyring i staden for parallellprosessering (parallell er standard)
 
 # Directions and modes  
 direction-generate = Leksikalsk/Generering
@@ -25,21 +25,21 @@ mode-generate-only = Berre generering
 mode-all = Alle
 
 # Error messages
-error-no-tests-after-filter = Ingen testar tilgjengeleg etter filtrering.
+error-no-tests-after-filter = Ingen testar tilgjengelege etter filtrering.
 error-invalid-test-number = Ugyldig testnummer {$number}. Gyldig område: 1..{$max}.
 error-test-not-found = Fann ikkje test med ID/tittel: {$test}
 error-validation-failed = Feil: {$error}
 
 # Info messages
-info-version = {$name} v{$version}
-info-suite = Suite         : {$name}
-info-lookup-tool = Lookup tool   : {$path}
-info-generator = Generator     : {$path}
-info-analyzer = Analyzer      : {$path}
-info-starting-tests = Startar testing ({$count} testar, modus: {$mode}) (batch processing)...
+info-version     = {$name} v{$version}
+info-suite       = Suite          : {$name}
+info-lookup-tool = Lookup-kommando: {$path}
+info-generator   = Generator      : {$path}
+info-analyzer    = Analysator     : {$path}
+info-starting-tests = Byrjar å testa ({$count} testar, modus: {$mode}) (batch processing)...
 info-starting-parallel = Suite: {$name} (parallel processing)...
-info-finished = Ferdig: passed {$passed}, failed {$failed}. Skriv rapport...
-info-all-finished = Alle testkøyringar ferdige. Total: {$total}, Passed: {$passed}, Failed: {$failed}
+info-finished = Ferdig: godkjende {$passed}, feila {$failed}. Skriv rapport...
+info-all-finished = Alle testkøyringar ferdige. I alt: {$total}, Godkjende: {$passed}, Feila: {$failed}
 
 # Test listing
 available-tests = Tilgjengelege testar:
@@ -57,17 +57,17 @@ report-no-lexical = <Ingen leksikalsk/generering>
 report-no-surface = <Ingen overflate/analyse>
 report-test-header = Test {$index}: {$group} ({$direction})
 report-test-summary = Test {$index} - Bestått: {$passes}, Feila: {$fails}, Totalt: {$total}
-report-total-summary = Totalt bestått: {$passes}, Totalt feila: {$fails}, Totalt: {$total}
+report-total-summary = I alt godkjent: {$passes}, I alt feila: {$fails}, I alt: {$total}
 report-final-counts = {$passes}/{$fails}/{$total}
 
 # Backend error messages
 backend-failed-to-start = Klarte ikkje å starta '{$cmd}'
 backend-missing-stdin = Manglar stdin
 backend-process-failed = Lookup-prosess feila med status {$status}
-backend-timeout = Lookup tidsavbrot etter {$seconds} s
+backend-timeout = Lookup-tidsavbrot etter {$seconds} s
 backend-process-failed-stderr = Lookup-prosess feila med status {$status}
 Stderr: {$stderr}
-backend-analyzer-not-set = Analyzer-FST ikkje sett
+backend-analyzer-not-set = Analysator-FST ikkje sett
 backend-generator-not-set = Generator-FST ikkje sett
 backend-command-not-executable = Lookup-kommando '{$cmd}' kunne ikkje køyrast: {$error}
 backend-command-not-found = Lookup-kommando '{$cmd}' finst ikkje eller kan ikkje køyrast. Sjekk at den er installert og i PATH.
@@ -91,7 +91,7 @@ spec-failed-to-read = Klarte ikkje å lesa: {$file}
 spec-yaml-error = YAML-feil i: {$file}
 spec-incomplete-config = Mangelfull eller utydeleg Config i {$file}
 spec-missing-config = Config manglar
-spec-missing-gen = Fann verken HFST.Gen eller Foma.Gen i Config
+spec-missing-gen = Fann korkje HFST.Gen eller Foma.Gen i Config
 spec-missing-hfst = Config.hfst manglar
 spec-missing-hfst-gen = Config.hfst.Gen manglar
 spec-missing-foma = Config.foma manglar

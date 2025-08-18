@@ -1,9 +1,9 @@
 # CLI help text
-cli-about = ᛘᚮᚱᚠᚮᛚᚮᚵᛁᛋᚴ ᛏᛁᛋᛏᛚᚯᚤᛁᚱ (ᚮᚠᛁᚱᚠᛚᛆᛏᛁ/ᛆᚿᛆᛚᛦᛋᛁᚱ ᚮᚵ ᛚᛁᚴᛋᛁᚴᛆᛚᛋᚴ/ᚵᛁᚿᛁᚱᛁᚱᛁᚿᚵ)
-cli-backend = ᚠᛁᛚ ᛒᛆᚴᛁᚿᛏ/ᛋᛁᚴᛋᛌᚮᚿ (hfst ᛁᛚᛚᛁᚱ foma) [alias: -S/--section]
-cli-generator = ᚮᚠᛁᚱᛋᛏᛦᚱ ᚵᛁᚿᛁᚱᛆᛏᚮᚱ-FST (.hfstol ᚠᚮᚱ HFST, .foma ᚠᚮᚱ Foma) [alias: --gen]
-cli-analyser = ᚮᚠᛁᚱᛋᛏᛦᚱ ᛆᚿᛆᛚᛦᛋᛁᚱ-FST (.hfstol ᚠᚮᚱ HFST, .foma ᚠᚮᚱ Foma) [alias: --morph, --analyzer]
-cli-silent = ᛋᛏᛁᛚᛚᛁ ᛘᚮᛏᚢᛋ: ᛁᛁᚿ ᚢᛏᛋᚴᚱᛁᚠᛏ, ᚮᚵ ᛏᛁᛘᛒ stderr ᚠᚱᚮ lookup
+cli-about = ᛘᚮᚱᚠᚮᛚᚮᚵᛁᛌᚴ ᛐᛂᛌᛐᚴᚯᛦᚱᛆᚱ (ᚮᚠᛂᚱᚠᛚᛆᛐᛂ / ᛆᚿᛆᛚᛦᛌᛂ ᚮᚵ ᛚᛂᚴᛌᛁᚴᛆᛚᛌᚴ / ᚵᛂᚿᛂᚱᛂᚱᛁᚿᚵ)
+cli-backend = ᚠᛂᛚ ᚠᛌᛐ-ᚠᚮᚱᛘᛆᛐ/ᛌᛂᚴᛌᛁᚮᚿ (ᚼᚠᛌᛐ ᛂᛚᛚᛂᚱ ᚠᚮᛘᛆ) [alias: -S/--section]
+cli-generator = ᚮᚠᛁᚱᛋᛏᛦᚱ ᚵᛁᚿᛁᚱᛆᛏᚮᚱ-ᚠᛌᛐ (.hfstol ᚠᚮᚱ HFST, .foma ᚠᚮᚱ Foma) [alias: --gen]
+cli-analyser = ᚮᚠᛁᚱᛋᛏᛦᚱ ᛆᚿᛆᛚᛦᛌᛂ-ᚠᛌᛐ (.hfstol ᚠᚮᚱ ᚼᚠᛌᛐ, .foma ᚠᚮᚱ ᚠᚮᛘᛆ) [alias: --morph, --analyzer]
+cli-silent = ᛌᛐᛁᛚᛚᛂ ᛘᚮᛑᚢᛌ: ᛁᚿᚵᛆ ᚢᛐᛌᚴᚱᛁᚠᛐ, ᚮᚵ ᛑᛂᛘᛔ stderr ᚠᚱᚭ lookup
 cli-lookup-tool = ᚮᚠᛁᚱᛋᛏᛦᚱ lookup-ᚴᚮᛘᛆᚿᛏᚮ (ᛏ.ᛏ. hfst-optimised-lookup, flookup) [alias: --app]
 cli-ignore-extra = ᛆᚿᛆᛚᛦᛋᛁ-ᛏᛁᛋᛏᛆᚱ: ᚵᚮᛏᚴᛌᛁᚿ ᚿᚮᚱ ᛆᛚᛚᛁ ᚠᚮᚱᚠᛁᚿᛏᛆ ᛆᚿᛆᛚᛦᛋᛆᚱ ᚠᛁᚿᛋᛏ, ᛋᛌᚯᛚᚠ ᚮᛘ ᛏᛁᛏ ᚠᛁᚿᛋᛏ ᛁᚴᛋᛏᚱᛆ ᛆᚿᛆᛚᛦᛋᛆᚱ
 cli-color = ᛏᚠᛁᚿᚵ ᚠᛆᚱᚵᛆᚱ ᛒᚮ (ᛋᛏᛆᚿᛏᛆᚱᛏ ᛁᚱ ᚠᛆᚱᚵᛆᚱ ᛒᚮ)

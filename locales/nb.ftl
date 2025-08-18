@@ -1,21 +1,21 @@
 # CLI help text
-cli-about = Morfologisk testløper (overflate/analyser og leksikalsk/generering)
-cli-backend = Velg backend/seksjon (hfst eller foma) [alias: -S/--section]
+cli-about = Morfologisk testkjører (overflate/analyse og leksikalsk/generering)
+cli-backend = Velg fst-format/seksjon (hfst eller foma) [alias: -S/--section]
 cli-generator = Overstyr generator-FST (.hfstol for HFST, .foma for Foma) [alias: --gen]
-cli-analyser = Overstyr analyser-FST (.hfstol for HFST, .foma for Foma) [alias: --morph, --analyzer]
+cli-analyser = Overstyr analysator-FST (.hfstol for HFST, .foma for Foma) [alias: --morph, --analyzer]
 cli-silent = Stille modus: ingen utskrift, og demp stderr fra lookup
 cli-lookup-tool = Overstyr lookup-kommando (f.eks. hfst-optimised-lookup, flookup) [alias: --app]
-cli-ignore-extra = Analyse-tester: godkjenn når alle forventede analyser finnes, selv om det finnes ekstra analyser
+cli-ignore-extra = For analysetester: godkjenn når alle forventede analyser finnes, selv om det finnes ekstra analyser
 cli-color = Tving farger på (standard er farger på)
 cli-no-color = Slå av farger i rapporten (overstyrer --color)
-cli-verbose = Vis metadata (lookup med full sti, generator/analyzer med fulle stier, versjon) og fremdriftsmeldinger. Viser også 'EXTRA' for Analyse-PASS når -i er aktiv.
-cli-surface = Kjør bare analysetester (surface form → analyses)
-cli-lexical = Kjør bare genereringstester (lexical tags → surface forms)
-cli-hide-fails = Skjul feil (FAIL), vis bare gjennomgåtte (PASS)
-cli-hide-passes = Skjul gjennomgåtte (PASS), vis bare feil (FAIL)
-cli-test = Kjør bare angitt test: nummer 1..N, tittel „Gruppe (Lexical/Generation|Surface/Analysis)" eller bare gruppenavnet fra YAML. Spesial: 0, 'null' eller 'liste' lister alle tilgjengelige tester og avslutter.
-cli-output = Rapportformat: compact | terse | final | normal (standard: normal)
-cli-serial = Bruk seriell kjøring i stedet for parallell prosessering (standardverdi er parallell)
+cli-verbose = Vis metadata (lookup med full sti, generator/analysator med fulle stier, versjon) og framdriftsmeldinger. Viser også 'EXTRA' for Analyse-PASS når -i er aktiv.
+cli-surface = Kjør bare analysetester (overflateform → analyse)
+cli-lexical = Kjør bare genereringstester (analyse → overflateform)
+cli-hide-fails = Skjul feil (FAIL), vis bare godkjente (PASS)
+cli-hide-passes = Skjul godkjente (PASS), vis bare feil (FAIL)
+cli-test = Kjør bare angitt test: nummer 1..N, tittel „Gruppe (Lexical/Generation|Surface/Analysis)" eller bare gruppenavnet fra YAML. Spesialtestnavn: 0, 'null' eller 'liste' lister alle tilgjengelige tester.
+cli-output = Rapportformat: normal | compact | terse | final (standard: normal)
+cli-serial = Bruk seriell kjøring i stedet for parallell prosessering (parallell er standard)
 
 # Directions and modes  
 direction-generate = Leksikalsk/Generering
@@ -25,21 +25,21 @@ mode-generate-only = Bare generering
 mode-all = Alle
 
 # Error messages
-error-no-tests-after-filter = Ingen tester tilgjengelig etter filtrering.
+error-no-tests-after-filter = Ingen tester tilgjengelige etter filtrering.
 error-invalid-test-number = Ugyldig testnummer {$number}. Gyldig område: 1..{$max}.
 error-test-not-found = Fant ikke test med ID/tittel: {$test}
 error-validation-failed = Feil: {$error}
 
 # Info messages
-info-version = {$name} v{$version}
-info-suite = Suite         : {$name}
-info-lookup-tool = Lookup tool   : {$path}
-info-generator = Generator     : {$path}
-info-analyzer = Analyzer      : {$path}
-info-starting-tests = Starter testing ({$count} tester, modus: {$mode}) (batch processing)...
-info-starting-parallel = Suite: {$name} (parallel processing)...
-info-finished = Ferdig: passed {$passed}, failed {$failed}. Skriver rapport...
-info-all-finished = Alle testkjøringer ferdige. Total: {$total}, Passed: {$passed}, Failed: {$failed}
+info-version     = {$name} v{$version}
+info-suite       = Suite          : {$name}
+info-lookup-tool = Lookup-kommando: {$path}
+info-generator   = Generator      : {$path}
+info-analyzer    = Analysator     : {$path}
+info-starting-tests = Begynner å teste ({$count} tester, modus: {$mode}) (batch processing)...
+info-starting-parallel = Suite: {$name} (parallellprosessering)...
+info-finished = Ferdig: godkjente {$passed}, feila {$failed}. Skriver rapport...
+info-all-finished = Alle testkjøringer ferdige. Totalt: {$total}, Godkjente: {$passed}, Feila: {$failed}
 
 # Test listing
 available-tests = Tilgjengelige tester:
@@ -56,8 +56,8 @@ report-unexpected-results = Uventede resultater: {$results}
 report-no-lexical = <Ingen leksikalsk/generering>
 report-no-surface = <Ingen overflate/analyse>
 report-test-header = Test {$index}: {$group} ({$direction})
-report-test-summary = Test {$index} - Bestått: {$passes}, Feilet: {$fails}, Totalt: {$total}
-report-total-summary = Totalt bestått: {$passes}, Totalt feilet: {$fails}, Totalt: {$total}
+report-test-summary = Test {$index} - Bestått: {$passes}, Feila: {$fails}, Totalt: {$total}
+report-total-summary = Totalt bestått: {$passes}, Totalt feila: {$fails}, Totalt: {$total}
 report-final-counts = {$passes}/{$fails}/{$total}
 
 # Backend error messages
@@ -67,7 +67,7 @@ backend-process-failed = Lookup-prosess feilet med status {$status}
 backend-timeout = Lookup tidsavbrudd etter {$seconds} s
 backend-process-failed-stderr = Lookup-prosess feilet med status {$status}
 Stderr: {$stderr}
-backend-analyzer-not-set = Analyzer-FST ikke satt
+backend-analyzer-not-set = Analysator-FST ikke satt
 backend-generator-not-set = Generator-FST ikke satt
 backend-command-not-executable = Lookup-kommando '{$cmd}' kunne ikke kjøres: {$error}
 backend-command-not-found = Lookup-kommando '{$cmd}' finnes ikke eller kan ikke kjøres. Sjekk at den er installert og i PATH.

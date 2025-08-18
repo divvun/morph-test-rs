@@ -14,7 +14,7 @@ cli-lexical = Run only generation tests (lexical tags → surface forms)
 cli-hide-fails = Hide failures (FAIL), show only passed (PASS)
 cli-hide-passes = Hide passed (PASS), show only failures (FAIL)
 cli-test = Run only specified test: number 1..N, title "Group (Lexical/Generation|Surface/Analysis)" or just the group name from YAML. Special: 0, 'null' or 'list' lists all available tests and exits.
-cli-output = Report format: compact | terse | final | normal (default: normal)
+cli-output = Report format: normal | compact | terse | final (default: normal)
 cli-serial = Use serial execution instead of parallel processing (default is parallel)
 
 # Directions and modes
