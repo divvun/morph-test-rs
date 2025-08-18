@@ -1,5 +1,5 @@
 use anyhow::Result;
-use clap::{error::ErrorKind, Parser, ValueEnum};
+use clap::{error::ErrorKind, CommandFactory, Parser, ValueEnum};
 use colored::control::set_override as set_color_override;
 use futures::future::try_join_all;
 use morph_test2::backend::{Backend, DEFAULT_TIMEOUT, ExternalBackend};
@@ -241,6 +241,16 @@ struct BlockRef {
 /// Format clap errors with localized messages
 fn format_clap_error(error: clap::Error) -> String {
     let kind = error.kind();
+    
+    // Handle help and version specially
+    if kind == ErrorKind::DisplayHelp {
+        return create_custom_help();
+    }
+    if kind == ErrorKind::DisplayVersion {
+        print_custom_version();
+        std::process::exit(0);
+    }
+    
     let mut msg = error.to_string();
     
     // Apply common replacements for all error types
@@ -265,6 +275,31 @@ fn format_clap_error(error: clap::Error) -> String {
     }
 }
 
+/// Create custom localized help text
+fn create_custom_help() -> String {
+    let mut cmd = Cli::command();
+    let help = cmd.render_long_help();
+    let mut help_text = help.to_string();
+    
+    // Replace section headers with localized versions
+    help_text = help_text.replace("Arguments:", &t!("cli-help-arguments"));
+    help_text = help_text.replace("Options:", &t!("cli-help-options"));
+    help_text = help_text.replace("[default:", &format!("[{}:", t!("cli-help-default")));
+    help_text = help_text.replace("[aliases:", &format!("[{}:", t!("cli-help-aliases")));
+    help_text = help_text.replace("[possible values:", &format!("[{}:", t!("cli-help-possible-values")));
+    help_text = help_text.replace("Print help", &t!("cli-help-print-help"));
+    help_text = help_text.replace("Print version", &t!("cli-help-print-version"));
+    
+    help_text
+}
+
+/// Print custom localized version information
+fn print_custom_version() {
+    let version = env!("CARGO_PKG_VERSION");
+    let name = env!("CARGO_PKG_NAME");
+    println!("{} {}", name, version);
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     // Initialize localization first
@@ -273,8 +308,17 @@ async fn main() -> Result<()> {
     let cli = match Cli::try_parse() {
         Ok(cli) => cli,
         Err(error) => {
-            eprintln!("{}", format_clap_error(error));
-            std::process::exit(1);
+            let kind = error.kind();
+            if kind == ErrorKind::DisplayHelp {
+                println!("{}", format_clap_error(error));
+                std::process::exit(0);
+            } else if kind == ErrorKind::DisplayVersion {
+                format_clap_error(error); // This will print version and exit
+                unreachable!();
+            } else {
+                eprintln!("{}", format_clap_error(error));
+                std::process::exit(1);
+            }
         }
     };
 

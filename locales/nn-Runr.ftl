@@ -123,3 +123,12 @@ cli-error-unexpected-arg = ᚠᛆᚿᚿ ᛆᚱᚵᚢᛘᛂᚿᛏ '{$arg}' ᛋᚮ
 cli-error-label = ᚠᛂᛁᛚ:
 cli-tip-label = ᛏᛁᛔᛋ:
 cli-unexpected-argument = ᚢᚠᛂᚿᛏᛆ ᛆᚱᚵᚢᛘᛂᚿᛏ
+
+# CLI help text sections
+cli-help-arguments = ᛆᚱᚵᚢᛘᛂᚿᛏ:
+cli-help-options = ᚠᛆᛚ:
+cli-help-print-help = ᛋᚴᚱᛁᚠ ᚢᛏ ᚼᛂᛚᛔ
+cli-help-print-version = ᛋᚴᚱᛁᚠ ᚢᛏ ᚠᛂᚱᛋᛌᚮᚿ
+cli-help-default = ᛋᛏᛆᚿᛏᛆᚱᛏ:
+cli-help-aliases = ᛆᛚᛁᛆᛋ:
+cli-help-possible-values = ᛘᚯᚵᛚᛂᚵᛂ ᚠᛂᚱᛏᛁᛆᚱ:

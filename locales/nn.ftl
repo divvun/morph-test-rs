@@ -123,3 +123,12 @@ cli-error-unexpected-arg = Fann argument '{$arg}' som ikkje var venta, eller ikk
 cli-error-label = feil:
 cli-tip-label = tips:
 cli-unexpected-argument = uventa argument
+
+# CLI help text sections
+cli-help-arguments = Argument:
+cli-help-options = Val:
+cli-help-print-help = Skriv ut hjelp
+cli-help-print-version = Skriv ut versjon
+cli-help-default = standard:
+cli-help-aliases = alias:
+cli-help-possible-values = moglege verdiar:

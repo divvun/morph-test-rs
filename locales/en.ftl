@@ -123,3 +123,12 @@ cli-error-unexpected-arg = Found argument '{$arg}' which wasn't expected, or isn
 cli-error-label = error:
 cli-tip-label = tip:
 cli-unexpected-argument = unexpected argument
+
+# CLI help text sections
+cli-help-arguments = Arguments:
+cli-help-options = Options:
+cli-help-print-help = Print help
+cli-help-print-version = Print version
+cli-help-default = default:
+cli-help-aliases = aliases:
+cli-help-possible-values = possible values:
