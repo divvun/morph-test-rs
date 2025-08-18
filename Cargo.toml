@@ -30,6 +30,8 @@ futures = "0.3"
 num_cpus = "1.16"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+unic-locale = "0.9"
+sys-locale = "0.3"
 
 [dev-dependencies]
 tempfile = "3.20"

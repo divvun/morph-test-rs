@@ -1,124 +1,270 @@
 use std::collections::HashMap;
-use std::sync::OnceLock;
+use std::fs;
+use std::path::Path;
+use std::sync::{Mutex, OnceLock};
+use unic_locale::LanguageIdentifier;
 
 /// Global localization state
-static LOCALIZER: OnceLock<Localizer> = OnceLock::new();
+static LOCALIZER: OnceLock<Mutex<Localizer>> = OnceLock::new();
 
 /// Initialize the global localizer
 pub fn init() {
     let localizer = Localizer::new();
     LOCALIZER
-        .set(localizer)
+        .set(Mutex::new(localizer))
         .expect("Failed to initialize localizer");
 }
 
 /// Get a localized message by key
 pub fn t(key: &str) -> String {
-    LOCALIZER.get().unwrap().get(key)
+    LOCALIZER
+        .get()
+        .unwrap()
+        .lock()
+        .unwrap()
+        .get(key)
 }
 
-/// Get a localized message by key with arguments (simplified)
+/// Get a localized message by key with arguments
 pub fn t_with_args(key: &str, args: &[(&str, &dyn std::fmt::Display)]) -> String {
-    LOCALIZER.get().unwrap().get_with_args(key, args)
+    LOCALIZER
+        .get()
+        .unwrap()
+        .lock()
+        .unwrap()
+        .get_with_args(key, args)
 }
 
-/// Localization manager
+/// Localization manager with BCP-47 support and graceful fallbacks
 #[derive(Debug)]
 pub struct Localizer {
     messages: HashMap<String, String>,
+    available_locales: Vec<LanguageIdentifier>,
+    current_locale: LanguageIdentifier,
 }
 
 impl Localizer {
     fn new() -> Self {
-        let current_language = Self::detect_language();
-        let messages = Self::load_messages(&current_language);
-
-        Self { messages }
+        let mut localizer = Self {
+            messages: HashMap::new(),
+            available_locales: Vec::new(),
+            current_locale: "en".parse().unwrap(),
+        };
+        
+        // Discover available locales from the locales directory
+        localizer.discover_available_locales();
+        
+        // Detect the best locale to use
+        let selected_locale = localizer.select_best_locale();
+        
+        // Load messages for the selected locale
+        localizer.load_locale(&selected_locale);
+        
+        localizer
     }
 
-    fn detect_language() -> String {
-        // Check environment variables in order of preference
-        let lang_vars = ["LC_ALL", "LC_MESSAGES", "LANG"];
-
-        for var in &lang_vars {
-            if let Ok(value) = std::env::var(var) {
-                // Handle full locale strings first (e.g., "nn-Runr", "nn_Runr", "nn-Runr_NO")
-                let locale_without_encoding = value.split('.').next().unwrap_or(&value);
-                let locale_parts: Vec<&str> = locale_without_encoding.split('_').collect();
-                
-                // Check for nn-Runr variants
-                if let Some(lang_script) = locale_parts.first() {
-                    match lang_script.to_lowercase().as_str() {
-                        "nn-runr" => return "nn-Runr".to_string(),
-                        _ => {}
+    /// Discover all available locales by scanning the locales directory
+    fn discover_available_locales(&mut self) {
+        let locales_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("locales");
+        
+        if let Ok(entries) = fs::read_dir(&locales_dir) {
+            for entry in entries.flatten() {
+                if let Some(filename) = entry.file_name().to_str() {
+                    if filename.ends_with(".ftl") {
+                        let locale_str = filename.strip_suffix(".ftl").unwrap();
+                        
+                        // Try to parse as a valid BCP-47 locale
+                        if let Ok(locale_id) = locale_str.parse::<LanguageIdentifier>() {
+                            self.available_locales.push(locale_id);
+                        }
                     }
-                }
-
-                // Parse standard locale format (e.g., "nn_NO.UTF-8" -> "nn")
-                let lang_code = locale_parts
-                    .first()
-                    .unwrap_or(&locale_without_encoding)
-                    .split('-')
-                    .next()
-                    .unwrap_or(locale_without_encoding)
-                    .to_lowercase();
-
-                match lang_code.as_str() {
-                    "nn" | "nno" => return "nn".to_string(),
-                    "nb" | "no" | "nor" => return "nb".to_string(),
-                    "en" => return "en".to_string(),
-                    _ => continue,
                 }
             }
         }
-
-        // Default to English
-        "en".to_string()
+        
+        // Ensure English is always available as fallback
+        let en: LanguageIdentifier = "en".parse().unwrap();
+        if !self.available_locales.contains(&en) {
+            self.available_locales.push(en);
+        }
+        
+        // Sort by specificity (more specific first)
+        self.available_locales.sort_by(|a, b| {
+            let a_parts = format!("{}", a).matches('-').count();
+            let b_parts = format!("{}", b).matches('-').count();
+            b_parts.cmp(&a_parts)
+        });
     }
 
-    fn load_messages(language: &str) -> HashMap<String, String> {
+    /// Select the best available locale based on system preferences
+    fn select_best_locale(&self) -> LanguageIdentifier {
+        // Get user preferences from system locale and environment
+        let user_locales = self.get_user_locale_preferences();
+        
+        // Find the best match using fallback logic
+        for user_locale in &user_locales {
+            if let Some(best_match) = self.find_best_match(user_locale) {
+                return best_match;
+            }
+        }
+        // Ultimate fallback to English
+        "en".parse().unwrap()
+    }
+
+    /// Get user locale preferences from environment variables
+    fn get_user_locale_preferences(&self) -> Vec<LanguageIdentifier> {
+        let mut preferences = Vec::new();
+        
+        // Check standard environment variables first (higher priority)
+        let env_vars = ["LC_ALL", "LC_MESSAGES", "LANG"];
+        for var in &env_vars {
+            if let Ok(value) = std::env::var(var) {
+                // Parse locale, removing encoding (e.g., "nn-Runr.UTF-8" -> "nn-Runr")
+                let locale_str = value.split('.').next().unwrap_or(&value).replace('_', "-");
+                if let Ok(locale_id) = locale_str.parse::<LanguageIdentifier>() {
+                    if !preferences.contains(&locale_id) {
+                        preferences.push(locale_id);
+                    }
+                }
+            }
+        }
+        
+        // Try system locale as fallback
+        if let Some(system_locale) = sys_locale::get_locale() {
+            if let Ok(locale_id) = system_locale.replace('_', "-").parse::<LanguageIdentifier>() {
+                if !preferences.contains(&locale_id) {
+                    preferences.push(locale_id);
+                }
+            }
+        }
+        
+        // Add English as final fallback
+        let en: LanguageIdentifier = "en".parse().unwrap();
+        if !preferences.contains(&en) {
+            preferences.push(en);
+        }
+        
+        preferences
+    }
+
+    /// Find the best matching locale with graceful fallbacks
+    fn find_best_match(&self, requested: &LanguageIdentifier) -> Option<LanguageIdentifier> {
+        // Try exact match first
+        if self.available_locales.contains(requested) {
+            return Some(requested.clone());
+        }
+        
+        // Build fallback chain
+        let mut fallback_chain = Vec::new();
+        
+        // Start with the original request
+        fallback_chain.push(requested.clone());
+        
+        // Try removing variant if present
+        if requested.variants().next().is_some() {
+            let without_variant = LanguageIdentifier::from_parts(
+                requested.language,
+                requested.script,
+                requested.region,
+                &[],
+            );
+            fallback_chain.push(without_variant);
+        }
+        
+        // Try removing region if present
+        if requested.region.is_some() {
+            let without_region = LanguageIdentifier::from_parts(
+                requested.language,
+                requested.script,
+                None,
+                &[],
+            );
+            fallback_chain.push(without_region);
+        }
+        
+        // Try just language if script was present
+        if requested.script.is_some() || requested.region.is_some() {
+            let lang_only = LanguageIdentifier::from_parts(
+                requested.language,
+                None,
+                None,
+                &[],
+            );
+            fallback_chain.push(lang_only);
+        }
+        
+        // Check each fallback
+        for fallback in fallback_chain {
+            if self.available_locales.contains(&fallback) {
+                return Some(fallback);
+            }
+        }
+        
+        None
+    }
+
+    /// Load messages for the specified locale
+    fn load_locale(&mut self, locale: &LanguageIdentifier) {
+        let locale_str = locale.to_string();
+        let locales_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("locales");
+        let file_path = locales_dir.join(format!("{}.ftl", locale_str));
+        
+        if let Ok(content) = fs::read_to_string(&file_path) {
+            self.messages = self.parse_fluent_content(&content);
+            self.current_locale = locale.clone();
+            return;
+        }
+        
+        // Fallback to English if requested locale failed to load
+        if locale_str != "en" {
+            let en_locale: LanguageIdentifier = "en".parse().unwrap();
+            self.load_locale(&en_locale);
+        }
+    }
+
+    /// Parse Fluent (.ftl) content into a simple key-value map
+    fn parse_fluent_content(&self, content: &str) -> HashMap<String, String> {
         let mut messages = HashMap::new();
-
-        // Load the appropriate language file content
-        let content = match language {
-            "nn" => include_str!("../locales/nn.ftl"),
-            "nn-Runr" => include_str!("../locales/nn-Runr.ftl"),
-            "nb" => include_str!("../locales/nb.ftl"),
-            _ => include_str!("../locales/en.ftl"), // Default to English
-        };
-
-        // Parse simple key = value format
+        
         for line in content.lines() {
             let line = line.trim();
             if line.is_empty() || line.starts_with('#') {
                 continue;
             }
-
+            
             if let Some((key, value)) = line.split_once(" = ") {
                 messages.insert(key.trim().to_string(), value.trim().to_string());
             }
         }
-
+        
         messages
     }
 
+    /// Get a localized message by key
     fn get(&self, key: &str) -> String {
         self.messages.get(key).cloned().unwrap_or_else(|| {
-            eprintln!("Missing translation key: {key}");
-            format!("MISSING: {key}")
+            eprintln!("Missing translation key: {}", key);
+            format!("MISSING: {}", key)
         })
     }
 
+    /// Get a localized message with arguments
     fn get_with_args(&self, key: &str, args: &[(&str, &dyn std::fmt::Display)]) -> String {
         let mut message = self.get(key);
-
+        
         // Simple string replacement for {$var} patterns
         for (var_name, value) in args {
-            let placeholder = format!("{{${var_name}}}");
-            message = message.replace(&placeholder, &format!("{value}"));
+            let placeholder = format!("{{${}}}", var_name);
+            message = message.replace(&placeholder, &format!("{}", value));
         }
-
+        
         message
+    }
+
+    /// Get current locale for debugging
+    #[allow(dead_code)]
+    pub fn current_locale(&self) -> &LanguageIdentifier {
+        &self.current_locale
     }
 }
 
@@ -147,17 +293,62 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_basic_localization() {
-        let localizer = Localizer::new();
-
-        // Test that we can get a basic message
-        let message = localizer.get("cli-about");
-        assert!(!message.is_empty());
+    fn test_locale_discovery() {
+        let mut localizer = Localizer {
+            messages: HashMap::new(),
+            available_locales: Vec::new(),
+            current_locale: "en".parse().unwrap(),
+        };
+        
+        localizer.discover_available_locales();
+        assert!(!localizer.available_locales.is_empty());
+        
+        // English should always be available
+        let en: LanguageIdentifier = "en".parse().unwrap();
+        assert!(localizer.available_locales.contains(&en));
     }
 
     #[test]
-    fn test_language_detection() {
-        // Test that language detection doesn't panic
-        let _lang = Localizer::detect_language();
+    fn test_fallback_logic() {
+        let localizer = Localizer {
+            messages: HashMap::new(),
+            current_locale: "en".parse().unwrap(),
+            available_locales: vec![
+                "en".parse().unwrap(),
+                "nn".parse().unwrap(),
+                "nn-Runr".parse().unwrap(),
+            ],
+        };
+
+        // Test exact match
+        let requested: LanguageIdentifier = "nn-Runr".parse().unwrap();
+        assert_eq!(localizer.find_best_match(&requested), Some(requested));
+
+        // Test fallback from region to script
+        let with_region: LanguageIdentifier = "nn-Runr-NO".parse().unwrap();
+        let expected: LanguageIdentifier = "nn-Runr".parse().unwrap();
+        assert_eq!(localizer.find_best_match(&with_region), Some(expected));
+
+        // Test fallback to language only
+        let script_only: LanguageIdentifier = "nn-Latn".parse().unwrap();
+        let expected_lang: LanguageIdentifier = "nn".parse().unwrap();
+        assert_eq!(localizer.find_best_match(&script_only), Some(expected_lang));
+    }
+
+    #[test]
+    fn test_locale_parsing() {
+        // Test various locale formats
+        let test_cases = vec![
+            ("en", true),
+            ("nn", true),
+            ("nn-Runr", true),
+            ("nn-Runr-NO", true),
+            ("123-invalid", false),  // Invalid language code
+        ];
+
+        for (locale_str, should_parse) in test_cases {
+            let result = locale_str.parse::<LanguageIdentifier>();
+            assert_eq!(result.is_ok(), should_parse, "Failed parsing: {}", locale_str);
+        }
     }
 }
