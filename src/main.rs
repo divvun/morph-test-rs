@@ -121,6 +121,7 @@ struct Cli {
     #[arg(
         short = 'c',
         long = "color",
+        alias = "colour",
         help = t!("cli-color")
     )]
     color: bool,
