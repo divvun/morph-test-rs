@@ -1,6 +1,8 @@
 use anyhow::Result;
 use clap::{error::ErrorKind, CommandFactory, Parser, ValueEnum};
 use colored::control::set_override as set_color_override;
+use colored::Colorize;
+use regex::Regex;
 use futures::future::try_join_all;
 use morph_test2::backend::{Backend, DEFAULT_TIMEOUT, ExternalBackend};
 use morph_test2::engine::run_suites;
@@ -238,6 +240,18 @@ struct BlockRef {
     dir: morph_test2::types::Direction,
 }
 
+/// Format CLI flags to be bold using regex matching
+fn format_flags_bold(text: &str) -> String {
+    // Regex to match CLI flags: --word or -letter, but not inside [aliases: ...] or similar
+    let flag_regex = Regex::new(r"(?m)^(\s*)(--?\w+(?:-\w+[^<\n]*)*)").unwrap();
+    
+    flag_regex.replace_all(text, |caps: &regex::Captures| {
+        let indent = &caps[1];
+        let flag = &caps[2];
+        format!("{}{}", indent, flag.bold())
+    }).to_string()
+}
+
 /// Format clap errors with localized messages
 fn format_clap_error(error: clap::Error) -> String {
     let kind = error.kind();
@@ -253,13 +267,19 @@ fn format_clap_error(error: clap::Error) -> String {
     
     let mut msg = error.to_string();
     
-    // Apply common replacements for all error types
-    msg = msg.replace("Usage:", &t!("cli-error-usage"));
+    // Apply common replacements for all error types with formatting
+    msg = msg.replace("Usage:", &format!("{}", t!("cli-error-usage").bold().underline()));
     msg = msg.replace("For more information, try '--help'.", &t!("cli-error-help-info"));
     msg = msg.replace("For more information try --help", &t!("cli-error-help-info"));
-    msg = msg.replace("error:", &t!("cli-error-label"));
+    msg = msg.replace("error:", &format!("{}", t!("cli-error-label").red().bold()));
     msg = msg.replace("tip:", &t!("cli-tip-label"));
     msg = msg.replace("unexpected argument", &t!("cli-unexpected-argument"));
+    
+    // Make program name bold in usage lines
+    msg = msg.replace("morph-test2", &format!("{}", "morph-test2".bold()));
+    
+    // Make option flags bold using the formatting function
+    msg = format_flags_bold(&msg);
     
     match kind {
         ErrorKind::MissingRequiredArgument => {
@@ -281,15 +301,21 @@ fn create_custom_help() -> String {
     let help = cmd.render_long_help();
     let mut help_text = help.to_string();
     
-    // Replace section headers with localized versions
-    help_text = help_text.replace("Usage:", &t!("cli-error-usage"));
-    help_text = help_text.replace("Arguments:", &t!("cli-help-arguments"));
-    help_text = help_text.replace("Options:", &t!("cli-help-options"));
+    // Replace section headers with localized versions and formatting
+    help_text = help_text.replace("Usage:", &format!("{}", t!("cli-error-usage").bold().underline()));
+    help_text = help_text.replace("Arguments:", &format!("{}", t!("cli-help-arguments").bold().underline()));
+    help_text = help_text.replace("Options:", &format!("{}", t!("cli-help-options").bold().underline()));
     help_text = help_text.replace("[default:", &format!("[{}:", t!("cli-help-default")));
     help_text = help_text.replace("[aliases:", &format!("[{}:", t!("cli-help-aliases")));
     help_text = help_text.replace("[possible values:", &format!("[{}:", t!("cli-help-possible-values")));
     help_text = help_text.replace("Print help", &t!("cli-help-print-help"));
     help_text = help_text.replace("Print version", &t!("cli-help-print-version"));
+    
+    // Make program name bold in usage lines
+    help_text = help_text.replace("morph-test2", &format!("{}", "morph-test2".bold()));
+    
+    // Make option flags bold using the formatting function
+    help_text = format_flags_bold(&help_text);
     
     // Clean up excessive blank lines and lines before [standard::, [alias::, and [moglege verdiar:: 
     let lines: Vec<&str> = help_text.lines().collect();
