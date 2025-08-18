@@ -13,7 +13,7 @@ pub fn init() {
     let localizer = Localizer::new();
     LOCALIZER
         .set(Mutex::new(localizer))
-        .expect("Failed to initialize localizer");
+        .expect("Failed to initialize localizer"); // Cannot use t!() here - bootstrap problem
 }
 
 /// Get a localized message by key
@@ -301,8 +301,16 @@ impl Localizer {
     /// Get a localized message by key
     fn get(&self, key: &str) -> String {
         self.messages.get(key).cloned().unwrap_or_else(|| {
-            eprintln!("Missing translation key: {}", key);
-            format!("MISSING: {}", key)
+            // Try to get localized error messages, but fallback to English if not available
+            let missing_msg = self.messages.get("i18n-missing-key")
+                .map(|template| template.replace("{$key}", key))
+                .unwrap_or_else(|| format!("Missing translation key: {}", key));
+            let missing_format = self.messages.get("i18n-missing-format")
+                .map(|template| template.replace("{$key}", key))
+                .unwrap_or_else(|| format!("MISSING: {}", key));
+            
+            eprintln!("{}", missing_msg);
+            missing_format
         })
     }
 
@@ -416,7 +424,7 @@ mod tests {
 
         for (locale_str, should_parse) in test_cases {
             let result = locale_str.parse::<LanguageIdentifier>();
-            assert_eq!(result.is_ok(), should_parse, "Failed parsing: {}", locale_str);
+            assert_eq!(result.is_ok(), should_parse, "Parse failed for: {}", locale_str);
         }
     }
 

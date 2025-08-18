@@ -107,3 +107,9 @@ debug-pool-completed = Pulje-batch fullført: {$inputs} inndata prosessert, {$re
 engine-not-processed = Ikke prosessert
 engine-batch-analyze-error = Batch-analysefeil: {$error}
 engine-batch-generate-error = Batch-genereringsfeil: {$error}
+
+# I18N system messages
+i18n-init-failed = Klarte ikke å initialisere lokaliseringssystemet
+i18n-missing-key = Mangler oversettelsesnøkkel: {$key}
+i18n-missing-format = MANGLER: {$key}  
+i18n-parse-failed = Klarte ikke å parse: {$input}

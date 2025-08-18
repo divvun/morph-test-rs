@@ -1,6 +1,7 @@
 use crate::pool::PooledBackend;
 use crate::report::calculate_counts;
 use crate::types::{CaseResult, Direction, Summary, TestSuite};
+use crate::{t, t_args};
 use anyhow::Result;
 use std::collections::BTreeSet;
 
@@ -46,7 +47,7 @@ pub async fn run_suites_async(
             input: String::new(),
             expected: vec![],
             actual: vec![],
-            error: Some("Not processed".to_string()),
+            error: Some(t!("engine-not-processed")),
             passed: false,
         };
         all_cases.len()
@@ -107,7 +108,7 @@ pub async fn run_suites_async(
                     input: case.input.clone(),
                     expected: case.expect.clone(),
                     actual: vec![],
-                    error: Some(format!("Batch analyze error: {e}")),
+                    error: Some(t_args!("engine-batch-analyze-error", "error" => &e)),
                     passed: false,
                 };
             }
@@ -140,7 +141,7 @@ pub async fn run_suites_async(
                     input: case.input.clone(),
                     expected: case.expect.clone(),
                     actual: vec![],
-                    error: Some(format!("Batch generate error: {e}")),
+                    error: Some(t_args!("engine-batch-generate-error", "error" => &e)),
                     passed: false,
                 };
             }

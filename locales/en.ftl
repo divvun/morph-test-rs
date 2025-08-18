@@ -107,3 +107,9 @@ debug-pool-completed = Pool batch completed: {$inputs} inputs processed, {$resul
 engine-not-processed = Not processed
 engine-batch-analyze-error = Batch analyze error: {$error}
 engine-batch-generate-error = Batch generate error: {$error}
+
+# I18N system messages
+i18n-init-failed = Failed to initialize localizer
+i18n-missing-key = Missing translation key: {$key}
+i18n-missing-format = MISSING: {$key}
+i18n-parse-failed = Failed parsing: {$input}

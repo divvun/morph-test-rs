@@ -1,6 +1,7 @@
 use crate::backend::Backend;
 use crate::report::calculate_counts;
 use crate::types::{CaseResult, Direction, Summary, TestSuite};
+use crate::{t, t_args};
 use std::collections::BTreeSet;
 
 fn set_eq(a: &[String], b: &[String]) -> bool {
@@ -45,7 +46,7 @@ pub fn run_suites<B: Backend>(
             input: String::new(),
             expected: vec![],
             actual: vec![],
-            error: Some("Not processed".to_string()),
+            error: Some(t!("engine-not-processed")),
             passed: false,
         };
         all_cases.len()
@@ -86,7 +87,7 @@ pub fn run_suites<B: Backend>(
                         input: case.input.clone(),
                         expected: case.expect.clone(),
                         actual: vec![],
-                        error: Some(format!("Batch analyze error: {e}")),
+                        error: Some(t_args!("engine-batch-analyze-error", "error" => &e)),
                         passed: false,
                     };
                 }
@@ -125,7 +126,7 @@ pub fn run_suites<B: Backend>(
                         input: case.input.clone(),
                         expected: case.expect.clone(),
                         actual: vec![],
-                        error: Some(format!("Batch generate error: {e}")),
+                        error: Some(t_args!("engine-batch-generate-error", "error" => &e)),
                         passed: false,
                     };
                 }

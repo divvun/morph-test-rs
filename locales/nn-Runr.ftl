@@ -107,3 +107,9 @@ debug-pool-completed = ᛒᚢᛚᛌᛁ-batch ᚠᚢᛚᛚᚠᚯᚱᛏ: {$inputs}
 engine-not-processed = ᛁᚴᚴᛁ ᛒᚱᚮᛋᛁᛋᛋᛁᚱᛏ
 engine-batch-analyze-error = ᛒᛆᛏᚳ-ᛆᚿᛆᛚᛦᛋᛁᚠᛖᛁᛚ: {$error}
 engine-batch-generate-error = ᛒᛆᛏᚳ-ᚵᛁᚿᛁᚱᛁᚱᛁᚿᚵᛋᚠᛖᛁᛚ: {$error}
+
+# I18N system messages
+i18n-init-failed = ᚴᛚᛆᚱᛏᛁ ᛁᚴᚴᛁ ᚮ ᛁᚿᛁᛋᛁᛆᛚᛁᛋᛂᚱᛂ ᛚᚮᚴᛆᛚᛁᛋᛂᚱᛁᚿᚵᛋᛋᛦᛋᛏᛂᛘᛂᛏ
+i18n-missing-key = ᛘᛆᚿᚵᛚᛆᚱ ᚮᛘᛋᛂᛏᛌᛁᚿᚵᛋᚿᚯᚴᚴᛂᛚ: {$key}
+i18n-missing-format = ᛘᛆᚿᚵᛚᛆᚱ: {$key}
+i18n-parse-failed = ᚴᛚᛆᚱᛏᛁ ᛁᚴᚴᛁ ᚮ ᛒᛆᚱᛋᛂ: {$input}
