@@ -55,7 +55,7 @@ impl From<OutputFormat> for OutputKind {
 #[command(
     version,
     author,
-    about = "Morphological test runner (surface/analyze and lexical/generate)"
+    about = t!("cli-about")
 )]
 struct Cli {
     // TEST_PATHS: one or more YAML files/directories with test data
@@ -69,7 +69,7 @@ struct Cli {
         default_value = "hfst",
         visible_short_alias = 'S',
         visible_alias = "section",
-        help = "Vel backend/section (hfst eller foma) [alias: -S/--section]"
+        help = t!("cli-backend")
     )]
     backend: BackendOpt,
 
@@ -78,7 +78,7 @@ struct Cli {
         long,
         value_name = "FILE",
         visible_alias = "gen",
-        help = "Overstyr generator-FST (.hfstol for HFST, .foma for Foma) [alias: --gen]"
+        help = t!("cli-generator")
     )]
     generator: Option<String>,
 
@@ -87,7 +87,7 @@ struct Cli {
         long,
         value_name = "FILE",
         visible_aliases = ["morph", "analyzer"],
-        help = "Overstyr analyser-FST (.hfstol for HFST, .foma for Foma) [alias: --morph, --analyzer]"
+        help = t!("cli-analyser")
     )]
     analyser: Option<String>,
 
@@ -95,7 +95,7 @@ struct Cli {
     #[arg(
         short = 'q',
         long = "silent",
-        help = "Stille modus: ingen utskrift, og demp stderr frå lookup"
+        help = t!("cli-silent")
     )]
     silent: bool,
     // Override lookup command
@@ -103,7 +103,7 @@ struct Cli {
         long = "lookup-tool",
         value_name = "CMD",
         visible_alias = "app",
-        help = "Overstyr lookup-kommando (t.d. hfst-optimised-lookup, flookup) [alias: --app]"
+        help = t!("cli-lookup-tool")
     )]
     lookup_tool: Option<String>,
 
@@ -111,7 +111,7 @@ struct Cli {
     #[arg(
         short = 'i',
         long = "ignore-extra-analyses",
-        help = "Analyze-testar: godkjenn når alle forventa analysar finst, sjølv om det finst ekstra analysar"
+        help = t!("cli-ignore-extra")
     )]
     ignore_extra_analyses: bool,
 
@@ -119,13 +119,13 @@ struct Cli {
     #[arg(
         short = 'c',
         long = "color",
-        help = "Tving fargar på (standard er fargar på)"
+        help = t!("cli-color")
     )]
     color: bool,
 
     #[arg(
         long = "no-color",
-        help = "Slå av fargar i rapporten (overstyrer --color)"
+        help = t!("cli-no-color")
     )]
     no_color: bool,
 
@@ -133,7 +133,7 @@ struct Cli {
     #[arg(
         short = 'v',
         long = "verbose",
-        help = "Vis metadata (lookup med full sti, generator/analyzer med fulle stiar, versjon) og framdriftsmeldingar. Viser òg ‘EXTRA’ for Analyze-PASS når -i er aktiv."
+        help = t!("cli-verbose")
     )]
     verbose: bool,
 
@@ -142,7 +142,7 @@ struct Cli {
         short = 's',
         long = "surface",
         conflicts_with = "lexical",
-        help = "Køyr berre analysetestar (surface form → analyses)"
+        help = t!("cli-surface")
     )]
     surface: bool,
 
@@ -150,7 +150,7 @@ struct Cli {
         short = 'l',
         long = "lexical",
         conflicts_with = "surface",
-        help = "Køyr berre genereringstestar (lexical tags → surface forms)"
+        help = t!("cli-lexical")
     )]
     lexical: bool,
 
@@ -159,7 +159,7 @@ struct Cli {
         short = 'f',
         long = "hide-fails",
         conflicts_with = "hide_passes",
-        help = "Skjul feil (FAIL), vis berre gjennomgåtte (PASS)"
+        help = t!("cli-hide-fails")
     )]
     hide_fails: bool,
 
@@ -167,7 +167,7 @@ struct Cli {
         short = 'p',
         long = "hide-passes",
         conflicts_with = "hide_fails",
-        help = "Skjul gjennomgåtte (PASS), vis berre feil (FAIL)"
+        help = t!("cli-hide-passes")
     )]
     hide_passes: bool,
 
@@ -177,7 +177,7 @@ struct Cli {
         short = 't',
         long = "test",
         value_name = "TEST",
-        help = "Køyr berre angitt test: nummer 1..N, tittel „Gruppe (Lexical/Generation|Surface/Analysis)” eller berre gruppenamnet frå YAML. Spesial: 0, ‘null’ eller ‘liste’ listar alle tilgjengelege testar og avsluttar."
+        help = t!("cli-test")
     )]
     test: Option<String>,
 
@@ -187,14 +187,14 @@ struct Cli {
         long = "output",
         value_enum,
         default_value = "normal",
-        help = "Rapportformat: compact | terse | final | normal (standard: normal)"
+        help = t!("cli-output")
     )]
     output: OutputFormat,
 
     // Serial execution (opt-out of default parallel processing)
     #[arg(
         long = "serial",
-        help = "Bruk seriell køyring i staden for parallell processing (standardverdi er parallell)"
+        help = t!("cli-serial")
     )]
     use_serial: bool,
 }
