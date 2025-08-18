@@ -1,5 +1,5 @@
 use anyhow::Result;
-use clap::{Parser, ValueEnum};
+use clap::{error::ErrorKind, Parser, ValueEnum};
 use colored::control::set_override as set_color_override;
 use futures::future::try_join_all;
 use morph_test2::backend::{Backend, DEFAULT_TIMEOUT, ExternalBackend};
@@ -238,12 +238,45 @@ struct BlockRef {
     dir: morph_test2::types::Direction,
 }
 
+/// Format clap errors with localized messages
+fn format_clap_error(error: clap::Error) -> String {
+    let kind = error.kind();
+    let mut msg = error.to_string();
+    
+    // Apply common replacements for all error types
+    msg = msg.replace("Usage:", &t!("cli-error-usage"));
+    msg = msg.replace("For more information, try '--help'.", &t!("cli-error-help-info"));
+    msg = msg.replace("For more information try --help", &t!("cli-error-help-info"));
+    msg = msg.replace("error:", &t!("cli-error-label"));
+    msg = msg.replace("tip:", &t!("cli-tip-label"));
+    msg = msg.replace("unexpected argument", &t!("cli-unexpected-argument"));
+    
+    match kind {
+        ErrorKind::MissingRequiredArgument => {
+            msg.replace("the following required arguments were not provided:", &t!("cli-error-missing-args"))
+        }
+        ErrorKind::InvalidValue => {
+            msg.replace("invalid value", &t!("cli-error-invalid-value"))
+        }
+        ErrorKind::UnknownArgument => {
+            msg.replace("found argument", &t!("cli-error-unexpected-arg"))
+        }
+        _ => msg,
+    }
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     // Initialize localization first
     i18n::init();
 
-    let cli = Cli::parse();
+    let cli = match Cli::try_parse() {
+        Ok(cli) => cli,
+        Err(error) => {
+            eprintln!("{}", format_clap_error(error));
+            std::process::exit(1);
+        }
+    };
 
     // Initialize tracing based on verbose flag and environment
     let filter = if cli.verbose {

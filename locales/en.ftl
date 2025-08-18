@@ -113,3 +113,13 @@ i18n-init-failed = Failed to initialize localizer
 i18n-missing-key = Missing translation key: {$key}
 i18n-missing-format = MISSING: {$key}
 i18n-parse-failed = Failed parsing: {$input}
+
+# CLI error messages
+cli-error-missing-args = The following required arguments were not provided:
+cli-error-usage = Usage:
+cli-error-help-info = For more information, try '--help'.
+cli-error-invalid-value = Invalid value '{$value}' for '{$arg}'
+cli-error-unexpected-arg = Found argument '{$arg}' which wasn't expected, or isn't valid in this context
+cli-error-label = error:
+cli-tip-label = tip:
+cli-unexpected-argument = unexpected argument

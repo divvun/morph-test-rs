@@ -113,3 +113,13 @@ i18n-init-failed = Klarte ikkje å initialisere lokaliseringsystemet
 i18n-missing-key = Manglar omsetjingsnøkkel: {$key}
 i18n-missing-format = MANGLAR: {$key}
 i18n-parse-failed = Klarte ikkje å parse: {$input}
+
+# CLI error messages
+cli-error-missing-args = Desse obligatoriske argumenta vart ikkje oppgjevne:
+cli-error-usage = Bruk:
+cli-error-help-info = For meir informasjon, prøv '--help'.
+cli-error-invalid-value = Ugyldig verdi '{$value}' for '{$arg}'
+cli-error-unexpected-arg = Fann argument '{$arg}' som ikkje var venta, eller ikkje er gyldig i denne konteksten
+cli-error-label = feil:
+cli-tip-label = tips:
+cli-unexpected-argument = uventa argument

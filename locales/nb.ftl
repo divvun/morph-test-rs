@@ -111,5 +111,15 @@ engine-batch-generate-error = Batch-genereringsfeil: {$error}
 # I18N system messages
 i18n-init-failed = Klarte ikke å initialisere lokaliseringssystemet
 i18n-missing-key = Mangler oversettelsesnøkkel: {$key}
-i18n-missing-format = MANGLER: {$key}  
+i18n-missing-format = MANGLER: {$key}
 i18n-parse-failed = Klarte ikke å parse: {$input}
+
+# CLI error messages
+cli-error-missing-args = Følgende obligatoriske argumenter ble ikke oppgitt:
+cli-error-usage = Bruk:
+cli-error-help-info = For mer informasjon, prøv '--help'.
+cli-error-invalid-value = Ugyldig verdi '{$value}' for '{$arg}'
+cli-error-unexpected-arg = Fant argument '{$arg}' som ikke var forventet, eller ikke er gyldig i denne konteksten
+cli-error-label = feil:
+cli-tip-label = tips:
+cli-unexpected-argument = uventet argument
