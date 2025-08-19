@@ -95,11 +95,11 @@ impl ExternalBackend {
 
         // Parse batch output - FST tools output: input\toutput format
         let stdout = String::from_utf8_lossy(&out.stdout);
-        let mut results_map: IndexMap<String, Vec<String>> = IndexMap::new();
+        let mut results_map: IndexMap<String, std::collections::BTreeSet<String>> = IndexMap::new();
 
         // Initialize all inputs in the map to preserve order and handle no-result cases
         for input in inputs {
-            results_map.insert(input.trim().to_string(), Vec::new());
+            results_map.insert(input.trim().to_string(), std::collections::BTreeSet::new());
         }
 
         for raw_line in stdout.lines() {
@@ -118,13 +118,13 @@ impl ExternalBackend {
 
                 // Handle +inf (no result) marker
                 if output == "+inf" {
-                    // Input with no results - already initialized as empty Vec
+                    // Input with no results - already initialized as empty Set
                     continue;
                 }
 
                 if !output.is_empty() && output != "@" {
                     if let Some(results) = results_map.get_mut(&input) {
-                        results.push(output);
+                        results.insert(output);
                     }
                 }
             }
@@ -134,7 +134,8 @@ impl ExternalBackend {
         let mut all_results = Vec::new();
         for input in inputs {
             let input_key = input.trim().to_string();
-            let results = results_map.shift_remove(&input_key).unwrap_or_default();
+            let results_set = results_map.shift_remove(&input_key).unwrap_or_default();
+            let results: Vec<String> = results_set.into_iter().collect();
             all_results.push(results);
         }
 
