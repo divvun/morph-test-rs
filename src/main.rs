@@ -581,11 +581,7 @@ async fn process_suites_sequential(
     for swc in suites {
         // Override from CLI
         let effective_gen = cli.generator.clone().unwrap_or_else(|| swc.gen_fst.clone());
-        let effective_morph = if let Some(m) = &cli.analyser {
-            Some(m.clone())
-        } else {
-            swc.morph_fst.clone()
-        };
+        let effective_morph = cli.analyser.clone().or(swc.morph_fst.clone());
 
         let effective_lookup = cli
             .lookup_tool

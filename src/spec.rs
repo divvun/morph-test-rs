@@ -93,7 +93,7 @@ pub fn load_specs(paths: &[PathBuf], prefer: BackendChoice) -> Result<Vec<SuiteW
             .with_context(|| t_args!("spec-failed-to-read", "file" => f.display()))?;
         let raw: RawSpec = serde_yaml::from_str(&content)
             .with_context(|| t_args!("spec-yaml-error", "file" => f.display()))?;
-        let (backend, lookup_cmd, gen_fst, morph_fst) = resolve_backend(&raw, &prefer)
+        let (backend, lookup_cmd, gen_fst, morph_fst) = resolve_backend(&raw, &prefer, &f)
             .with_context(|| t_args!("spec-incomplete-config", "file" => f.display()))?;
         let mut cases: Vec<TestCase> = Vec::new();
         // For each group: build both generate-cases and invert to analyze-cases
@@ -153,9 +153,24 @@ pub fn load_specs(paths: &[PathBuf], prefer: BackendChoice) -> Result<Vec<SuiteW
     Ok(out)
 }
 
+fn resolve_path_relative_to_yaml(path: &str, yaml_file_path: &PathBuf) -> String {
+    let path_buf = std::path::Path::new(path);
+    if path_buf.is_absolute() {
+        path.to_string()
+    } else {
+        // Resolve relative to the YAML file's directory
+        if let Some(yaml_dir) = yaml_file_path.parent() {
+            yaml_dir.join(path).to_string_lossy().into_owned()
+        } else {
+            path.to_string()
+        }
+    }
+}
+
 fn resolve_backend(
     raw: &RawSpec,
     prefer: &BackendChoice,
+    yaml_file_path: &PathBuf,
 ) -> Result<(BackendChoice, String, String, Option<String>)> {
     let cfg = raw
         .config
@@ -184,8 +199,8 @@ fn resolve_backend(
                 .r#gen
                 .clone()
                 .ok_or_else(|| anyhow!(t!("spec-missing-hfst-gen")))?;
-            let gen_ = gen_.trim().to_string();
-            let morph = h.morph.clone().map(|m| m.trim().to_string());
+            let gen_ = resolve_path_relative_to_yaml(&gen_.trim(), yaml_file_path);
+            let morph = h.morph.clone().map(|m| resolve_path_relative_to_yaml(&m.trim(), yaml_file_path));
             let cmd = "hfst-optimised-lookup".to_string();
             Ok((BackendChoice::Hfst, cmd, gen_, morph))
         }
@@ -198,8 +213,8 @@ fn resolve_backend(
                 .r#gen
                 .clone()
                 .ok_or_else(|| anyhow!(t!("spec-missing-foma-gen")))?;
-            let gen_ = gen_.trim().to_string();
-            let morph = x.morph.clone().map(|m| m.trim().to_string());
+            let gen_ = resolve_path_relative_to_yaml(&gen_.trim(), yaml_file_path);
+            let morph = x.morph.clone().map(|m| resolve_path_relative_to_yaml(&m.trim(), yaml_file_path));
             let cmd = x
                 .app
                 .clone()
