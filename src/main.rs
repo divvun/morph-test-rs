@@ -9,7 +9,7 @@ use morph_test2::engine::run_suites;
 use morph_test2::engine_async::run_suites_async;
 use morph_test2::i18n;
 use morph_test2::pool::PooledBackend;
-use morph_test2::report::{OutputKind, print_human};
+use morph_test2::report::{OutputKind, print_human, calculate_counts};
 use morph_test2::spec::{BackendChoice, load_specs};
 use morph_test2::{t, t_args};
 use std::collections::{HashMap, HashSet};
@@ -550,18 +550,22 @@ async fn main() -> Result<()> {
         process_suites_with_pool(suites, &cli, &mut aggregate).await?;
     }
 
+    // Calculate final counts using the same method as the report
+    let all_cases: Vec<&morph_test2::types::CaseResult> = aggregate.cases.iter().collect();
+    let (total_passes, total_fails, total_checks) = calculate_counts(&all_cases, cli.ignore_extra_analyses);
+
     if cli.verbose && !cli.silent {
         info!(
             "{}",
             t_args!("info-all-finished",
-                "total" => aggregate.total,
-                "passed" => aggregate.passed,
-                "failed" => aggregate.failed
+                "total" => total_checks,
+                "passed" => total_passes,
+                "failed" => total_fails
             )
         );
     }
 
-    if aggregate.failed > 0 {
+    if total_fails > 0 {
         std::process::exit(1);
     }
 
