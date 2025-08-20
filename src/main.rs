@@ -731,9 +731,37 @@ async fn process_suites_with_pool(
                 let mut group_summaries = Vec::new();
                 for swc in group_suites {
                     if cli.verbose && !cli.silent {
+                        let effective_gen = cli.generator.clone().unwrap_or_else(|| swc.gen_fst.clone());
+                        let effective_morph = cli.analyser.clone().or(swc.morph_fst.clone());
+                        let effective_lookup = cli
+                            .lookup_tool
+                            .clone()
+                            .map(|s| s.trim().to_string())
+                            .unwrap_or_else(|| swc.lookup_cmd.clone());
+
+                        let lookup_full = resolve_lookup_path(&effective_lookup);
+                        let gen_full = display_path(&effective_gen);
+                        let morph_full = effective_morph
+                            .as_deref()
+                            .map(display_path)
+                            .unwrap_or_else(|| "-".to_string());
+                        let mode_txt = if cli.surface {
+                            t!("mode-analyze-only")
+                        } else if cli.lexical {
+                            t!("mode-generate-only")
+                        } else {
+                            t!("mode-all")
+                        };
+                        info!("{}", t_args!("info-suite", "name" => &swc.suite.name));
+                        info!("{}", t_args!("info-lookup-tool", "path" => &lookup_full));
+                        info!("{}", t_args!("info-generator", "path" => &gen_full));
+                        info!("{}", t_args!("info-analyzer", "path" => &morph_full));
                         info!(
                             "{}",
-                            t_args!("info-starting-parallel", "name" => &swc.suite.name)
+                            t_args!("info-starting-tests",
+                                "count" => swc.suite.cases.len(),
+                                "mode" => &mode_txt
+                            )
                         );
                     }
 

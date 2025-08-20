@@ -7,16 +7,20 @@ use morph_test2::types::*;
 struct MockBackend;
 
 impl Backend for MockBackend {
-    fn analyze(&self, _input: &str) -> Result<Vec<String>> {
-        Ok(vec![])
+    fn analyze_batch(&self, inputs: &[String]) -> Result<Vec<Vec<String>>> {
+        Ok(inputs.iter().map(|_| vec![]).collect())
     }
-    fn generate(&self, _input: &str) -> Result<Vec<String>> {
-        Ok(vec!["a".into(), "b".into(), "c".into()])
+    fn generate_batch(&self, inputs: &[String]) -> Result<Vec<Vec<String>>> {
+        Ok(inputs.iter().map(|_| vec!["a".into(), "b".into(), "c".into()]).collect())
+    }
+    fn validate(&self) -> Result<()> {
+        Ok(())
     }
 }
 
 #[test]
 fn order_does_not_matter_for_lists() {
+    morph_test2::i18n::init();
     let suite = TestSuite {
         name: "order".into(),
         cases: vec![TestCase {

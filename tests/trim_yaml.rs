@@ -8,21 +8,37 @@ use tempfile::tempdir;
 struct MockGen;
 
 impl Backend for MockGen {
-    fn analyze(&self, _input: &str) -> Result<Vec<String>> {
-        Ok(vec![])
+    fn analyze_batch(&self, inputs: &[String]) -> Result<Vec<Vec<String>>> {
+        let results = inputs.iter().map(|input| {
+            // Return expected analysis results for the trimmed test inputs
+            match input.as_str() {
+                "gæljoejidie" => vec!["gæljodh+V+TV+Ind+Prs+Pl2".into()],
+                "bar" => vec!["foo+V".into()],
+                "baz" => vec!["foo+V".into()],
+                _ => vec![],
+            }
+        }).collect();
+        Ok(results)
     }
-    fn generate(&self, input: &str) -> Result<Vec<String>> {
-        // Returnerer eksakt, utan ekstra blank
-        Ok(match input {
-            "gæljodh+V+TV+Ind+Prs+Pl2" => vec!["gæljoejidie".into()],
-            "foo+V" => vec!["bar".into(), "baz".into()],
-            _ => vec![],
-        })
+    fn generate_batch(&self, inputs: &[String]) -> Result<Vec<Vec<String>>> {
+        let results = inputs.iter().map(|input| {
+            // Returnerer eksakt, utan ekstra blank
+            match input.as_str() {
+                "gæljodh+V+TV+Ind+Prs+Pl2" => vec!["gæljoejidie".into()],
+                "foo+V" => vec!["bar".into(), "baz".into()],
+                _ => vec![],
+            }
+        }).collect();
+        Ok(results)
+    }
+    fn validate(&self) -> Result<()> {
+        Ok(())
     }
 }
 
 #[test]
 fn trims_spaces_in_yaml_keys_and_values() -> Result<()> {
+    morph_test2::i18n::init();
     let dir = tempdir()?;
     let file = dir.path().join("suite.yaml");
     let yaml = r#"
