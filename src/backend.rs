@@ -122,6 +122,12 @@ impl ExternalBackend {
                     continue;
                 }
 
+                // Handle cases where FST couldn't process: input==output with +? in third column
+                if cols.len() >= 3 && input == output && cols[2].trim().contains("+?") {
+                    // FST failed to generate/analyze - treat as no result
+                    continue;
+                }
+
                 if !output.is_empty() && output != "@" {
                     if let Some(results) = results_map.get_mut(&input) {
                         results.insert(output);
