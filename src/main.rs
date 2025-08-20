@@ -10,7 +10,7 @@ use morph_test2::engine_async::run_suites_async;
 use morph_test2::i18n;
 use morph_test2::pool::PooledBackend;
 use morph_test2::report::{OutputKind, print_human, calculate_counts};
-use morph_test2::spec::{BackendChoice, load_specs};
+use morph_test2::spec::{BackendChoice, load_specs, determine_hfst_lookup_tool};
 use morph_test2::{t, t_args};
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
@@ -583,11 +583,21 @@ async fn process_suites_sequential(
         let effective_gen = cli.generator.clone().unwrap_or_else(|| swc.gen_fst.clone());
         let effective_morph = cli.analyser.clone().or(swc.morph_fst.clone());
 
-        let effective_lookup = cli
-            .lookup_tool
-            .clone()
-            .map(|s| s.trim().to_string())
-            .unwrap_or_else(|| swc.lookup_cmd.clone());
+        let effective_lookup = if let Some(lookup) = &cli.lookup_tool {
+            lookup.trim().to_string()
+        } else {
+            // If CLI FSTs are provided but no lookup tool, determine based on FST extensions
+            if cli.generator.is_some() || cli.analyser.is_some() {
+                // Check if this is an HFST backend
+                if matches!(swc.backend, BackendChoice::Hfst) {
+                    determine_hfst_lookup_tool(&effective_gen, effective_morph.as_deref())
+                } else {
+                    swc.lookup_cmd.clone()
+                }
+            } else {
+                swc.lookup_cmd.clone()
+            }
+        };
 
         if cli.verbose && !cli.silent {
             let lookup_full = resolve_lookup_path(&effective_lookup);
@@ -677,11 +687,21 @@ async fn process_suites_with_pool(
         // Create a key based on lookup command and FST files
         let effective_gen = cli.generator.clone().unwrap_or_else(|| swc.gen_fst.clone());
         let effective_morph = cli.analyser.clone().or(swc.morph_fst.clone());
-        let effective_lookup = cli
-            .lookup_tool
-            .clone()
-            .map(|s| s.trim().to_string())
-            .unwrap_or_else(|| swc.lookup_cmd.clone());
+        let effective_lookup = if let Some(lookup) = &cli.lookup_tool {
+            lookup.trim().to_string()
+        } else {
+            // If CLI FSTs are provided but no lookup tool, determine based on FST extensions
+            if cli.generator.is_some() || cli.analyser.is_some() {
+                // Check if this is an HFST backend
+                if matches!(swc.backend, BackendChoice::Hfst) {
+                    determine_hfst_lookup_tool(&effective_gen, effective_morph.as_deref())
+                } else {
+                    swc.lookup_cmd.clone()
+                }
+            } else {
+                swc.lookup_cmd.clone()
+            }
+        };
 
         let key = format!(
             "{}__{}__{}",
@@ -706,11 +726,21 @@ async fn process_suites_with_pool(
                     .clone()
                     .unwrap_or_else(|| first_suite.gen_fst.clone());
                 let effective_morph = cli.analyser.clone().or(first_suite.morph_fst.clone());
-                let effective_lookup = cli
-                    .lookup_tool
-                    .clone()
-                    .map(|s| s.trim().to_string())
-                    .unwrap_or_else(|| first_suite.lookup_cmd.clone());
+                let effective_lookup = if let Some(lookup) = &cli.lookup_tool {
+                    lookup.trim().to_string()
+                } else {
+                    // If CLI FSTs are provided but no lookup tool, determine based on FST extensions
+                    if cli.generator.is_some() || cli.analyser.is_some() {
+                        // Check if this is an HFST backend
+                        if matches!(first_suite.backend, BackendChoice::Hfst) {
+                            determine_hfst_lookup_tool(&effective_gen, effective_morph.as_deref())
+                        } else {
+                            first_suite.lookup_cmd.clone()
+                        }
+                    } else {
+                        first_suite.lookup_cmd.clone()
+                    }
+                };
 
                 let pooled_backend = PooledBackend::new(
                     effective_lookup,
@@ -729,11 +759,21 @@ async fn process_suites_with_pool(
                     if cli.verbose && !cli.silent {
                         let effective_gen = cli.generator.clone().unwrap_or_else(|| swc.gen_fst.clone());
                         let effective_morph = cli.analyser.clone().or(swc.morph_fst.clone());
-                        let effective_lookup = cli
-                            .lookup_tool
-                            .clone()
-                            .map(|s| s.trim().to_string())
-                            .unwrap_or_else(|| swc.lookup_cmd.clone());
+                        let effective_lookup = if let Some(lookup) = &cli.lookup_tool {
+                            lookup.trim().to_string()
+                        } else {
+                            // If CLI FSTs are provided but no lookup tool, determine based on FST extensions
+                            if cli.generator.is_some() || cli.analyser.is_some() {
+                                // Check if this is an HFST backend
+                                if matches!(swc.backend, BackendChoice::Hfst) {
+                                    determine_hfst_lookup_tool(&effective_gen, effective_morph.as_deref())
+                                } else {
+                                    swc.lookup_cmd.clone()
+                                }
+                            } else {
+                                swc.lookup_cmd.clone()
+                            }
+                        };
 
                         let lookup_full = resolve_lookup_path(&effective_lookup);
                         let gen_full = display_path(&effective_gen);

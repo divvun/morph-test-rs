@@ -167,6 +167,33 @@ fn resolve_path_relative_to_yaml(path: &str, yaml_file_path: &PathBuf) -> String
     }
 }
 
+pub fn determine_hfst_lookup_tool(gen_path: &str, morph_path: Option<&str>) -> String {
+    // Check the generator FST extension first
+    let gen_path_obj = std::path::Path::new(gen_path);
+    if let Some(ext) = gen_path_obj.extension() {
+        if ext == "hfst" {
+            return "hfst-lookup".to_string();
+        } else if ext == "hfstol" {
+            return "hfst-optimised-lookup".to_string();
+        }
+    }
+    
+    // If generator extension is unclear, check morph FST extension
+    if let Some(morph) = morph_path {
+        let morph_path_obj = std::path::Path::new(morph);
+        if let Some(ext) = morph_path_obj.extension() {
+            if ext == "hfst" {
+                return "hfst-lookup".to_string();
+            } else if ext == "hfstol" {
+                return "hfst-optimised-lookup".to_string();
+            }
+        }
+    }
+    
+    // Default to optimised-lookup for backward compatibility
+    "hfst-optimised-lookup".to_string()
+}
+
 fn resolve_backend(
     raw: &RawSpec,
     prefer: &BackendChoice,
@@ -201,7 +228,7 @@ fn resolve_backend(
                 .ok_or_else(|| anyhow!(t!("spec-missing-hfst-gen")))?;
             let gen_ = resolve_path_relative_to_yaml(&gen_.trim(), yaml_file_path);
             let morph = h.morph.clone().map(|m| resolve_path_relative_to_yaml(&m.trim(), yaml_file_path));
-            let cmd = "hfst-optimised-lookup".to_string();
+            let cmd = determine_hfst_lookup_tool(&gen_, morph.as_deref());
             Ok((BackendChoice::Hfst, cmd, gen_, morph))
         }
         BackendChoice::Foma => {
