@@ -140,7 +140,7 @@ impl ExternalBackend {
         let mut all_results = Vec::new();
         for input in inputs {
             let input_key = input.trim().to_string();
-            let results_set = results_map.shift_remove(&input_key).unwrap_or_default();
+            let results_set = results_map.get(&input_key).cloned().unwrap_or_default();
             let results: Vec<String> = results_set.into_iter().collect();
             all_results.push(results);
         }

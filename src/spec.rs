@@ -96,11 +96,12 @@ pub fn load_specs(paths: &[PathBuf], prefer: BackendChoice) -> Result<Vec<SuiteW
         let (backend, lookup_cmd, gen_fst, morph_fst) = resolve_backend(&raw, &prefer, &f)
             .with_context(|| t_args!("spec-incomplete-config", "file" => f.display()))?;
         let mut cases: Vec<TestCase> = Vec::new();
-        // For each group: build both generate-cases and invert to analyze-cases
+        // Global accumulator for analyze: surface -> set of analyses (lexical-key)
+        let mut surface_to_analyses: IndexMap<String, BTreeSet<String>> = IndexMap::new();
+        
+        // For each group: build generate-cases and collect surface forms
         for (group, map) in &raw.tests {
             let group_name = group.trim();
-            // Accumulator for analyze: surface -> set of analyses (lexical-key)
-            let mut surface_to_analyses: IndexMap<String, BTreeSet<String>> = IndexMap::new();
             for (lexical, expected) in map {
                 let lexical_trim = lexical.trim().to_string();
                 let expect_vec: Vec<String> = match expected {
@@ -121,19 +122,20 @@ pub fn load_specs(paths: &[PathBuf], prefer: BackendChoice) -> Result<Vec<SuiteW
                     entry.insert(lexical_trim.clone());
                 }
             }
-            // Create Analyze-cases from the accumulator
-            for (surface, analyses_set) in surface_to_analyses {
-                let mut analyses: Vec<String> = analyses_set.into_iter().collect();
-                // Stable, deterministic order
-                analyses.sort();
-                let name = format!("{group_name}: {surface}");
-                cases.push(TestCase {
-                    name,
-                    direction: Direction::Analyze,
-                    input: surface,
-                    expect: analyses,
-                });
-            }
+        }
+        
+        // Create Analyze-cases from the global accumulator
+        for (surface, analyses_set) in surface_to_analyses {
+            let mut analyses: Vec<String> = analyses_set.into_iter().collect();
+            // Stable, deterministic order
+            analyses.sort();
+            let name = format!("Analysis: {surface}");
+            cases.push(TestCase {
+                name,
+                direction: Direction::Analyze,
+                input: surface,
+                expect: analyses,
+            });
         }
         let suite = TestSuite {
             name: f
