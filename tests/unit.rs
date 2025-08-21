@@ -37,12 +37,14 @@ fn exact_match_and_order() {
                 direction: Direction::Generate,
                 input: "gæljodh+V+TV+Ind+Prs+Sg1".into(),
                 expect: vec!["gæljoem".into()],
+                expect_not: vec![],
             },
             TestCase {
                 name: "order_sensitive_fail".into(),
                 direction: Direction::Generate,
                 input: "multi".into(),
                 expect: vec!["b".into(), "a".into()],
+                expect_not: vec![],
             },
         ],
     };

@@ -108,18 +108,48 @@ pub fn load_specs(paths: &[PathBuf], prefer: BackendChoice) -> Result<Vec<SuiteW
                     OneOrMany::One(s) => vec![trim_owned(s)],
                     OneOrMany::Many(v) => v.iter().map(|s| s.trim().to_string()).collect(),
                 };
-                // 1) Generate-case: input=lexical, expect=surface-former
+                // Separate positive and negative expectations
+                let mut positive_forms = Vec::new();
+                let mut negative_forms = Vec::new();
+                
+                for surf in &expect_vec {
+                    if surf.starts_with('~') {
+                        // Negative test: remove ~ prefix for the actual form
+                        let actual_form = surf[1..].to_string();
+                        negative_forms.push(actual_form);
+                    } else {
+                        // Positive test
+                        positive_forms.push(surf.clone());
+                    }
+                }
+                
+                // 1) Generate-case: input=lexical, expect=positive surface forms, expect_not=negative forms
                 let name = format!("{}: {}", group_name, &lexical_trim);
                 cases.push(TestCase {
                     name,
                     direction: Direction::Generate,
                     input: lexical_trim.clone(),
-                    expect: expect_vec.clone(),
+                    expect: positive_forms.clone(),
+                    expect_not: negative_forms.clone(),
                 });
-                // 2) Invert to analyze: for each surface add lexical as analysis
-                for surf in expect_vec {
+                
+                // 2) Invert to analyze: only positive surface forms should analyze to lexical
+                for surf in positive_forms {
                     let entry = surface_to_analyses.entry(surf).or_default();
                     entry.insert(lexical_trim.clone());
+                }
+                
+                // 2b) Negative analyze-cases: negative forms should not analyze to anything
+                for neg_form in negative_forms {
+                    // Create a separate negative analysis test
+                    let name = format!("Analysis (negative): {}", neg_form);
+                    cases.push(TestCase {
+                        name,
+                        direction: Direction::Analyze,
+                        input: neg_form,
+                        expect: vec![], // Expect no result
+                        expect_not: vec![], // No negative expectations needed for these
+                    });
                 }
             }
         }
@@ -135,6 +165,7 @@ pub fn load_specs(paths: &[PathBuf], prefer: BackendChoice) -> Result<Vec<SuiteW
                 direction: Direction::Analyze,
                 input: surface,
                 expect: analyses,
+                expect_not: vec![], // No negative expectations for regular analysis tests
             });
         }
         let suite = TestSuite {

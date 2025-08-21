@@ -13,6 +13,7 @@ pub struct TestCase {
     pub direction: Direction,
     pub input: String,
     pub expect: Vec<String>,
+    pub expect_not: Vec<String>, // Negative expectations - these should NOT appear in results
 }
 
 #[derive(Debug, Clone)]

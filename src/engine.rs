@@ -16,6 +16,29 @@ fn expected_subset_of_actual(actual: &[String], expected: &[String]) -> bool {
     sb.is_subset(&sa)
 }
 
+fn test_with_negatives(actual: &[String], expected: &[String], expected_not: &[String], ignore_extra_analyses: bool) -> bool {
+    // First check positive expectations
+    let positive_pass = if ignore_extra_analyses {
+        expected_subset_of_actual(actual, expected)
+    } else {
+        set_eq(actual, expected)
+    };
+    
+    if !positive_pass {
+        return false;
+    }
+    
+    // Then check that none of the negative expectations are present
+    let actual_set: BTreeSet<&str> = actual.iter().map(|s| s.as_str()).collect();
+    for neg_item in expected_not {
+        if actual_set.contains(neg_item.as_str()) {
+            return false;
+        }
+    }
+    
+    true
+}
+
 pub fn run_suites<B: Backend>(
     backend: &B,
     suites: &[TestSuite],
@@ -61,11 +84,7 @@ pub fn run_suites<B: Backend>(
         match backend.analyze_batch(&inputs) {
             Ok(batch_results) => {
                 for ((idx, case), actual) in analyze_cases.iter().zip(batch_results.iter()) {
-                    let passed = if ignore_extra_analyses {
-                        expected_subset_of_actual(actual, &case.expect)
-                    } else {
-                        set_eq(actual, &case.expect)
-                    };
+                    let passed = test_with_negatives(actual, &case.expect, &case.expect_not, ignore_extra_analyses);
 
                     results[*idx] = CaseResult {
                         name: case.name.clone(),
@@ -104,7 +123,7 @@ pub fn run_suites<B: Backend>(
         match backend.generate_batch(&inputs) {
             Ok(batch_results) => {
                 for ((idx, case), actual) in generate_cases.iter().zip(batch_results.iter()) {
-                    let passed = set_eq(actual, &case.expect);
+                    let passed = test_with_negatives(actual, &case.expect, &case.expect_not, false);
 
                     results[*idx] = CaseResult {
                         name: case.name.clone(),
