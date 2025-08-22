@@ -357,6 +357,8 @@ fn search_upward_from_directory(start_dir: &std::path::Path, patterns: &[String]
 
 pub fn find_fst_files(lexc_file_path: &PathBuf, fst_type: &str) -> Result<(String, Option<String>)> {
     let analyzer_patterns = [
+        format!("analyser-{}.hfstol", fst_type),
+        format!("analyser-{}.hfst", fst_type),
         format!("analyzer-{}.hfstol", fst_type),
         format!("analyzer-{}.hfst", fst_type),
     ];
@@ -416,15 +418,13 @@ pub fn convert_lexc_to_suites(lexc_test_sets: Vec<LexcTestSet>, lexc_file_path: 
         // Determine lookup command
         let lookup_cmd = determine_hfst_lookup_tool(&gen_fst, morph_fst.as_deref());
         
-        // Convert to TestCases
-        let mut cases = Vec::new();
-        let mut surface_to_analyses: IndexMap<String, BTreeSet<String>> = IndexMap::new();
-        
+        // Convert to TestCases - one suite per test set
         for test_set in test_sets {
+            let mut cases = Vec::new();
             let group_name = format!("{} ({})", test_set.test_name, fst_type);
             
-            for (surface_form, analysis) in test_set.tests {
-                // Generate test case
+            // Generate test cases for this test set
+            for (surface_form, analysis) in &test_set.tests {
                 let name = format!("{}: {}", group_name, &analysis);
                 cases.push(TestCase {
                     name,
@@ -433,44 +433,39 @@ pub fn convert_lexc_to_suites(lexc_test_sets: Vec<LexcTestSet>, lexc_file_path: 
                     expect: vec![surface_form.clone()],
                     expect_not: vec![],
                 });
-                
-                // Collect for analysis tests
-                let entry = surface_to_analyses.entry(surface_form).or_default();
-                entry.insert(analysis);
             }
-        }
-        
-        // Create analysis tests
-        for (surface, analyses_set) in surface_to_analyses {
-            let mut analyses: Vec<String> = analyses_set.into_iter().collect();
-            analyses.sort();
-            let name = format!("Analysis: {}", surface);
-            cases.push(TestCase {
-                name,
-                direction: Direction::Analyze,
-                input: surface,
-                expect: analyses,
-                expect_not: vec![],
+            
+            // Analysis test cases for this test set
+            for (surface_form, analysis) in &test_set.tests {
+                let name = format!("{}: {}", group_name, &surface_form);
+                cases.push(TestCase {
+                    name,
+                    direction: Direction::Analyze,
+                    input: surface_form.clone(),
+                    expect: vec![analysis.clone()],
+                    expect_not: vec![],
+                });
+            }
+            
+            let suite_name = format!("{}-{}-{}.lexc", 
+                lexc_file_path.file_stem().unwrap_or_default().to_string_lossy(),
+                fst_type,
+                test_set.test_name.replace(" ", "_").replace("(", "").replace(")", "").replace("*", "").replace("\"", "")
+            );
+            
+            let suite = TestSuite {
+                name: suite_name,
+                cases,
+            };
+            
+            suites.push(SuiteWithConfig {
+                suite,
+                backend: BackendChoice::Hfst, // lexc files always use HFST
+                lookup_cmd: lookup_cmd.clone(),
+                gen_fst: gen_fst.clone(),
+                morph_fst: morph_fst.clone(),
             });
         }
-        
-        let suite_name = format!("{}-{}.lexc", 
-            lexc_file_path.file_stem().unwrap_or_default().to_string_lossy(),
-            fst_type
-        );
-        
-        let suite = TestSuite {
-            name: suite_name,
-            cases,
-        };
-        
-        suites.push(SuiteWithConfig {
-            suite,
-            backend: BackendChoice::Hfst, // lexc files always use HFST
-            lookup_cmd,
-            gen_fst,
-            morph_fst,
-        });
     }
     
     Ok(suites)
