@@ -266,7 +266,13 @@ pub fn parse_lexc_test_data(content: &str) -> Result<Vec<LexcTestSet>> {
                     let test_line = test_line.trim();
                     if let Some(colon_pos) = test_line.find(':') {
                         let surface_form = test_line[..colon_pos].trim().to_string();
-                        let analysis = test_line[colon_pos + 1..].trim().to_string();
+                        let analysis_part = &test_line[colon_pos + 1..];
+                        // Filter out comments starting with '!'
+                        let analysis = if let Some(comment_pos) = analysis_part.find('!') {
+                            analysis_part[..comment_pos].trim().to_string()
+                        } else {
+                            analysis_part.trim().to_string()
+                        };
                         test_set.tests.insert(surface_form, analysis);
                     }
                 }
