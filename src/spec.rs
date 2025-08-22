@@ -418,15 +418,16 @@ pub fn convert_lexc_to_suites(lexc_test_sets: Vec<LexcTestSet>, lexc_file_path: 
         // Determine lookup command
         let lookup_cmd = determine_hfst_lookup_tool(&gen_fst, morph_fst.as_deref());
         
-        // Convert to TestCases - one suite per test set
+        // Combine all test sets for this FST type into a single suite
+        let mut all_cases = Vec::new();
+        
         for test_set in test_sets {
-            let mut cases = Vec::new();
             let group_name = format!("{} ({})", test_set.test_name, fst_type);
             
             // Generate test cases for this test set
             for (surface_form, analysis) in &test_set.tests {
                 let name = format!("{}: {}", group_name, &analysis);
-                cases.push(TestCase {
+                all_cases.push(TestCase {
                     name,
                     direction: Direction::Generate,
                     input: analysis.clone(),
@@ -438,7 +439,7 @@ pub fn convert_lexc_to_suites(lexc_test_sets: Vec<LexcTestSet>, lexc_file_path: 
             // Analysis test cases for this test set
             for (surface_form, analysis) in &test_set.tests {
                 let name = format!("{}: {}", group_name, &surface_form);
-                cases.push(TestCase {
+                all_cases.push(TestCase {
                     name,
                     direction: Direction::Analyze,
                     input: surface_form.clone(),
@@ -446,26 +447,25 @@ pub fn convert_lexc_to_suites(lexc_test_sets: Vec<LexcTestSet>, lexc_file_path: 
                     expect_not: vec![],
                 });
             }
-            
-            let suite_name = format!("{}-{}-{}.lexc", 
-                lexc_file_path.file_stem().unwrap_or_default().to_string_lossy(),
-                fst_type,
-                test_set.test_name.replace(" ", "_").replace("(", "").replace(")", "").replace("*", "").replace("\"", "")
-            );
-            
-            let suite = TestSuite {
-                name: suite_name,
-                cases,
-            };
-            
-            suites.push(SuiteWithConfig {
-                suite,
-                backend: BackendChoice::Hfst, // lexc files always use HFST
-                lookup_cmd: lookup_cmd.clone(),
-                gen_fst: gen_fst.clone(),
-                morph_fst: morph_fst.clone(),
-            });
         }
+        
+        let suite_name = format!("{}-{}.lexc", 
+            lexc_file_path.file_stem().unwrap_or_default().to_string_lossy(),
+            fst_type
+        );
+        
+        let suite = TestSuite {
+            name: suite_name,
+            cases: all_cases,
+        };
+        
+        suites.push(SuiteWithConfig {
+            suite,
+            backend: BackendChoice::Hfst, // lexc files always use HFST
+            lookup_cmd,
+            gen_fst,
+            morph_fst,
+        });
     }
     
     Ok(suites)
