@@ -107,7 +107,16 @@ impl ExternalBackend {
             if trimmed.is_empty() {
                 continue;
             }
+            // Skip comments and warnings
             if trimmed.starts_with('!') || trimmed.starts_with('#') {
+                continue;
+            }
+            // Skip HFST warnings and messages
+            if trimmed.starts_with("/usr/local/bin/hfst-lookup: Warning:") ||
+               trimmed.starts_with("Using HFST basic transducer format") ||
+               trimmed.starts_with("Using ") ||
+               trimmed.starts_with("> ") ||
+               trimmed == ">" {
                 continue;
             }
 

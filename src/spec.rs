@@ -424,19 +424,25 @@ pub fn convert_lexc_to_suites(lexc_test_sets: Vec<LexcTestSet>, lexc_file_path: 
         for test_set in test_sets {
             let group_name = format!("{} ({})", test_set.test_name, fst_type);
             
-            // Generate test cases for this test set
+            // Group surface forms by analysis for generation tests
+            let mut analysis_to_surfaces: IndexMap<String, Vec<String>> = IndexMap::new();
             for (surface_form, analysis) in &test_set.tests {
-                let name = format!("{}: {}", group_name, &analysis);
+                analysis_to_surfaces.entry(analysis.clone()).or_default().push(surface_form.clone());
+            }
+            
+            // Generate test cases: one test per analysis, expecting all surface forms
+            for (analysis, surface_forms) in &analysis_to_surfaces {
+                let name = format!("{}: {}", group_name, analysis);
                 all_cases.push(TestCase {
                     name,
                     direction: Direction::Generate,
                     input: analysis.clone(),
-                    expect: vec![surface_form.clone()],
+                    expect: surface_forms.clone(),
                     expect_not: vec![],
                 });
             }
             
-            // Analysis test cases for this test set
+            // Analysis test cases: one per surface form
             for (surface_form, analysis) in &test_set.tests {
                 let name = format!("{}: {}", group_name, &surface_form);
                 all_cases.push(TestCase {

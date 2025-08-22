@@ -28,6 +28,7 @@ fn order_does_not_matter_for_lists() {
             direction: Direction::Generate,
             input: "X+V".into(),
             expect: vec!["c".into(), "a".into(), "b".into()],
+            expect_not: vec![],
         }],
     };
     let backend = MockBackend;
