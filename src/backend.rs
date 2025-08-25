@@ -107,8 +107,8 @@ impl ExternalBackend {
             if trimmed.is_empty() {
                 continue;
             }
-            // Skip comments and warnings
-            if trimmed.starts_with('!') || trimmed.starts_with('#') {
+            // Skip comments and warnings (only if the line doesn't contain a tab, meaning it's not FST output)
+            if (trimmed.starts_with('!') || trimmed.starts_with('#')) && !trimmed.contains('\t') {
                 continue;
             }
             // Skip HFST warnings and messages
