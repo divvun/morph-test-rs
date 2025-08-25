@@ -568,7 +568,7 @@ async fn main() -> Result<()> {
 
     if total_fails > 0 {
         // Report failing files in quiet mode or when there are multiple files
-        if (cli.silent || !cli.verbose) {
+        if cli.silent || !cli.verbose {
             if !failed_files.is_empty() {
                 eprintln!("Tests failed in files: {}", failed_files.join(", "));
             } else {
@@ -707,7 +707,7 @@ async fn process_suites_with_pool(
     suites: Vec<morph_test2::spec::SuiteWithConfig>,
     cli: &Cli,
     aggregate: &mut morph_test2::types::Summary,
-    failed_files: &mut Vec<String>,
+    _failed_files: &mut Vec<String>,
 ) -> Result<()> {
     // Group suites by backend configuration to share pools
     let mut backend_groups: HashMap<String, Vec<morph_test2::spec::SuiteWithConfig>> =
@@ -831,7 +831,7 @@ async fn process_suites_with_pool(
                         );
                     }
 
-                    let suite_name = swc.suite.name.clone();
+                    let _suite_name = swc.suite.name.clone();
                     let summary =
                         run_suites_async(&pooled_backend, &[swc.suite.clone()], cli.ignore_extra_analyses)
                             .await?;
