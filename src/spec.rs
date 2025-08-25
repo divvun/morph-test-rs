@@ -112,8 +112,8 @@ pub fn load_specs(paths: &[PathBuf], prefer: BackendChoice) -> Result<Vec<SuiteW
         let (backend, lookup_cmd, gen_fst, morph_fst) = resolve_backend(&raw, &prefer, &f)
             .with_context(|| t_args!("spec-incomplete-config", "file" => f.display()))?;
         let mut cases: Vec<TestCase> = Vec::new();
-        // Global accumulator for analyze: surface -> set of analyses (lexical-key)
-        let mut surface_to_analyses: IndexMap<String, BTreeSet<String>> = IndexMap::new();
+        // Global accumulator for analyze: (surface, group) -> set of analyses (lexical-key)
+        let mut surface_to_analyses: IndexMap<(String, String), BTreeSet<String>> = IndexMap::new();
         
         // For each group: build generate-cases and collect surface forms
         for (group, map) in &raw.tests {
@@ -151,7 +151,7 @@ pub fn load_specs(paths: &[PathBuf], prefer: BackendChoice) -> Result<Vec<SuiteW
                 
                 // 2) Invert to analyze: only positive surface forms should analyze to lexical
                 for surf in positive_forms {
-                    let entry = surface_to_analyses.entry(surf).or_default();
+                    let entry = surface_to_analyses.entry((surf, group_name.to_string())).or_default();
                     entry.insert(lexical_trim.clone());
                 }
                 
@@ -171,11 +171,11 @@ pub fn load_specs(paths: &[PathBuf], prefer: BackendChoice) -> Result<Vec<SuiteW
         }
         
         // Create Analyze-cases from the global accumulator
-        for (surface, analyses_set) in surface_to_analyses {
+        for ((surface, group_name), analyses_set) in surface_to_analyses {
             let mut analyses: Vec<String> = analyses_set.into_iter().collect();
             // Stable, deterministic order
             analyses.sort();
-            let name = format!("Analysis: {surface}");
+            let name = format!("{}: {}", group_name, surface);
             cases.push(TestCase {
                 name,
                 direction: Direction::Analyze,
