@@ -60,7 +60,8 @@ impl FstProcess {
                         continue;
                     }
 
-                    if trimmed.starts_with('!') || trimmed.starts_with('#') {
+                    // Skip comments and warnings (only if the line doesn't contain a tab, meaning it's not FST output)
+                    if (trimmed.starts_with('!') || trimmed.starts_with('#')) && !trimmed.contains('\t') {
                         continue;
                     }
 
