@@ -45,11 +45,11 @@ impl FstProcess {
 
         // Read all available output until timeout or reasonable limit
         let mut line = String::new();
-        let max_lines = inputs.len() * 50; // More generous limit for multiple results per input
+        let max_lines = inputs.len() * 200; // Much more generous limit for multiple results per input
 
         while lines_read < max_lines {
             line.clear();
-            match tokio::time::timeout(Duration::from_millis(500), self.stdout.read_line(&mut line))
+            match tokio::time::timeout(Duration::from_millis(5000), self.stdout.read_line(&mut line))
                 .await
             {
                 Ok(Ok(0)) => break, // EOF
