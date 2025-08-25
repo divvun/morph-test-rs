@@ -533,6 +533,7 @@ async fn main() -> Result<()> {
     }
 
     let mut aggregate = morph_test2::types::Summary::default();
+    let mut failed_files = Vec::new();
     if cli.verbose && !cli.silent {
         info!(
             "{}",
@@ -544,10 +545,10 @@ async fn main() -> Result<()> {
     }
     if cli.use_serial {
         // Use traditional sequential processing
-        process_suites_sequential(suites, &cli, &mut aggregate).await?;
+        process_suites_sequential(suites, &cli, &mut aggregate, &mut failed_files).await?;
     } else {
         // Use process pool for parallel execution (default)
-        process_suites_with_pool(suites, &cli, &mut aggregate).await?;
+        process_suites_with_pool(suites, &cli, &mut aggregate, &mut failed_files).await?;
     }
 
     // Calculate final counts using the same method as the report
@@ -566,6 +567,27 @@ async fn main() -> Result<()> {
     }
 
     if total_fails > 0 {
+        // Report failing files in quiet mode or when there are multiple files
+        if (cli.silent || !cli.verbose) {
+            if !failed_files.is_empty() {
+                eprintln!("Tests failed in files: {}", failed_files.join(", "));
+            } else {
+                // Fallback: extract file names from failing test cases (for pool mode)
+                let mut failing_files = std::collections::HashSet::new();
+                for case in &aggregate.cases {
+                    if !case.passed {
+                        // Try to extract file name from the test suite structure
+                        // This is a heuristic approach since we don't have direct file tracking in pool mode
+                        // We could improve this by modifying the data structures
+                        failing_files.insert("multiple files");
+                        break;
+                    }
+                }
+                if !failing_files.is_empty() {
+                    eprintln!("Tests failed (use --serial for detailed file reporting)");
+                }
+            }
+        }
         std::process::exit(1);
     }
 
@@ -576,6 +598,7 @@ async fn process_suites_sequential(
     suites: Vec<morph_test2::spec::SuiteWithConfig>,
     cli: &Cli,
     aggregate: &mut morph_test2::types::Summary,
+    failed_files: &mut Vec<String>,
 ) -> Result<()> {
     // Run per suite
     for swc in suites {
@@ -640,6 +663,7 @@ async fn process_suites_sequential(
             std::process::exit(2);
         }
 
+        let suite_name = swc.suite.name.clone();
         let summary = run_suites(&backend, &[swc.suite], cli.ignore_extra_analyses);
 
         if cli.verbose && !cli.silent {
@@ -663,6 +687,11 @@ async fn process_suites_sequential(
             );
         }
 
+        // Track files with failures
+        if summary.failed > 0 {
+            failed_files.push(suite_name);
+        }
+
         aggregate.total += summary.total;
         aggregate.passed += summary.passed;
         aggregate.failed += summary.failed;
@@ -678,6 +707,7 @@ async fn process_suites_with_pool(
     suites: Vec<morph_test2::spec::SuiteWithConfig>,
     cli: &Cli,
     aggregate: &mut morph_test2::types::Summary,
+    failed_files: &mut Vec<String>,
 ) -> Result<()> {
     // Group suites by backend configuration to share pools
     let mut backend_groups: HashMap<String, Vec<morph_test2::spec::SuiteWithConfig>> =
@@ -801,8 +831,9 @@ async fn process_suites_with_pool(
                         );
                     }
 
+                    let suite_name = swc.suite.name.clone();
                     let summary =
-                        run_suites_async(&pooled_backend, &[swc.suite], cli.ignore_extra_analyses)
+                        run_suites_async(&pooled_backend, &[swc.suite.clone()], cli.ignore_extra_analyses)
                             .await?;
 
                     if cli.verbose && !cli.silent {
@@ -834,6 +865,10 @@ async fn process_suites_with_pool(
         })
         .collect();
 
+    // TODO: For now, pool mode doesn't track failed files
+    // This is complex to implement due to the parallel processing structure
+    // Users can use --serial flag to get failed file reporting
+    
     // Await all groups and aggregate results
     let all_group_results = try_join_all(group_futures).await?;
     for group_summaries in all_group_results {
